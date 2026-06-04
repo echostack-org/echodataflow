@@ -2,14 +2,14 @@
   <a href="https://echodataflow.readthedocs.io/en/latest/?badge=latest">
     <img src="https://readthedocs.org/projects/echodataflow/badge/?version=latest"/>
   </a>
-  <a href="https://codecov.io/gh/OSOceanAcoustics/echodataflow" > 
- <img src="https://codecov.io/gh/OSOceanAcoustics/echodataflow/graph/badge.svg?token=YTMVVHG585"/> 
+  <a href="https://codecov.io/gh/echostack-org/echodataflow" > 
+ <img src="https://codecov.io/gh/echostack-org/echodataflow/graph/badge.svg?token=YTMVVHG585"/> 
  </a>
 </div> -->
 
 # Echodataflow: Streamlined Data Pipeline Orchestration
 
-Echodataflow streamlines echosounder data processing by combining [Prefect](https://www.prefect.io/)-based pipeline orchestration, YAML configuration, and [Echopype](https://github.com/OSOceanAcoustics/echopype) into a modular tool for defining, configuring, and executing workflows.
+Echodataflow streamlines echosounder data processing by combining [Prefect](https://www.prefect.io/)-based pipeline orchestration, YAML configuration, and [Echopype](https://github.com/echostack-org/echopype) into a modular tool for defining, configuring, and executing workflows.
 
 
 **Note:** Echodataflow v.0.1.x have been deprecated. We will release v0.2.0 soon!
@@ -27,12 +27,12 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
 2. If you would like to run Echodataflow as an installed package, 
    install it from the repo like below:
    ```bash
-   pip install git+https://github.com/OSOceanAcoustics/echodataflow.git  # install from repo
+   pip install git+https://github.com/echostack-org/echodataflow.git  # install from repo
    ```
    If you instead would like to install Echodataflow to develop it,
    clone the repo and install it like below:
    ```bash
-   git clone git+https://github.com/OSOceanAcoustics/echodataflow.git  # clone the repo
+   git clone git+https://github.com/echostack-org/echodataflow.git  # clone the repo
    pip install -e .[test,lint,docs]  # install in editable mode with dev tools
    ```
    
@@ -50,10 +50,10 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
    prefect worker start --pool "local"
    ```
 
-3. Download the recipes from the [echodataflow-recipes repository](https://github.com/OSOceanAcoustics/echodataflow-recipes) by clonining it to your computer:
+3. Download the recipes from the [echodataflow-recipes repository](https://github.com/echostack-org/echodataflow-recipes) by clonining it to your computer:
    ```
    cd REPO_DIRECTORY  # switch to where you want the recipes repo to sit
-   git clone https://github.com/OSOceanAcoustics/echodataflow-recipes.git
+   git clone https://github.com/echostack-org/echodataflow-recipes.git
    ```
 
 4. Deploy and run the ship pipeline:
@@ -70,10 +70,10 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
 
 3. Establish connection with the cloud Prefect server
 
-4. Download the recipes from the [echodataflow-recipes repository](https://github.com/OSOceanAcoustics/echodataflow-recipes) by clonining it to your computer:
+4. Download the recipes from the [echodataflow-recipes repository](https://github.com/echostack-org/echodataflow-recipes) by clonining it to your computer:
    ```
    cd REPO_DIRECTORY  # switch to where you want the recipes repo to sit
-   git clone https://github.com/OSOceanAcoustics/echodataflow-recipes.git
+   git clone https://github.com/echostack-org/echodataflow-recipes.git
    ```
 
 5. Deploy and run the ship pipeline:

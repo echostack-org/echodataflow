@@ -92,7 +92,7 @@ docs = [
 echodataflow = "echodataflow.echodataflow_cli:main"
 
 [project.urls]
-Homepage = "https://github.com/OSOceanAcoustics/echodataflow"
+Homepage = "https://github.com/echostack-org/echodataflow"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
