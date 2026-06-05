@@ -11,6 +11,9 @@
   <key>KeepAlive</key>
   <true/>
 
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+
   <key>WorkingDirectory</key>
   <string>/Users/feresa/code_git/echodataflow</string>
 
@@ -24,7 +27,16 @@
   <array>
     <string>/bin/zsh</string>
     <string>-lc</string>
-    <string>ENV_FILE=/Users/feresa/.config/echodataflow/services.env; [[ -f "$ENV_FILE" ]] || { echo "Missing $ENV_FILE"; exit 1; }; set -a; source "$ENV_FILE"; set +a; exec "$MAMBA_BIN" run -n "$ECHODATAFLOW_ENV" prefect worker start --pool "$PREFECT_POOL"</string>
+    <string>
+ENV_FILE=/Users/feresa/.config/echodataflow/services.env
+[[ -f "$ENV_FILE" ]] || { echo "Missing $ENV_FILE"; exit 1; }
+
+set -a
+source "$ENV_FILE"
+set +a
+
+exec "$MAMBA_BIN" run -n "$ECHODATAFLOW_ENV" prefect worker start --pool "$PREFECT_POOL"
+    </string>
   </array>
 
   <key>StandardOutPath</key>
