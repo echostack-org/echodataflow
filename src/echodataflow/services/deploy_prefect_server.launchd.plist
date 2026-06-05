@@ -22,17 +22,9 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/feresa/miniforge3/bin/mamba</string>
-    <string>run</string>
-    <string>-n</string>
-    <string>echodataflow_20260604</string>
-    <string>prefect</string>
-    <string>server</string>
-    <string>start</string>
-    <string>--host</string>
-    <string>127.0.0.1</string>
-    <string>--port</string>
-    <string>4200</string>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>ENV_FILE=/Users/feresa/.config/echodataflow/services.env; [[ -f "$ENV_FILE" ]] || { echo "Missing $ENV_FILE"; exit 1; }; set -a; source "$ENV_FILE"; set +a; exec "$MAMBA_BIN" run -n "$ECHODATAFLOW_ENV" prefect server start --host 127.0.0.1 --port 4200</string>
   </array>
 
   <key>StandardOutPath</key>

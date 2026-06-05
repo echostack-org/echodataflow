@@ -101,18 +101,21 @@ to `.service` `ExecStart` usage, with no wrapper shell script required.
 
 1. Copy and customize the templates for your user:
    ```shell
-   mkdir -p ~/Library/LaunchAgents ~/.local/var/log/echodataflow
+   mkdir -p ~/.config/echodataflow ~/Library/LaunchAgents ~/.local/var/log/echodataflow
+   cp src/echodataflow/services/services.env.example ~/.config/echodataflow/services.env
    cp src/echodataflow/services/deploy_prefect_server.launchd.plist ~/Library/LaunchAgents/org.echodataflow.prefect-server.plist
    cp src/echodataflow/services/deploy_prefect_worker.launchd.plist ~/Library/LaunchAgents/org.echodataflow.prefect-worker.plist
    ```
 
-2. Edit both copied plist files as needed:
-   - Set username path to the actual username
-   - Adjust mamba executable path
-   - Adjust conda environment name
-   - Adjust worker pool name if not using `local`.
+2. Edit `~/.config/echodataflow/services.env` as needed:
+   - Adjust `MAMBA_BIN`
+   - Adjust `ECHODATAFLOW_ENV`
+   - Adjust `PREFECT_POOL`
+   - Adjust `PREFECT_API_URL`
 
-3. Load and start services:
+3. If your macOS username is not `feresa`, update the `ENV_FILE`, `WorkingDirectory`, and log paths inside the two copied plist files.
+
+4. Load and start services:
    ```shell
    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-server.plist
    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-worker.plist
@@ -120,11 +123,12 @@ to `.service` `ExecStart` usage, with no wrapper shell script required.
    launchctl kickstart -k gui/$(id -u)/org.echodataflow.prefect-worker
    ```
 
-4. Check status and logs:
+5. Check status and logs:
    ```shell
    launchctl print gui/$(id -u)/org.echodataflow.prefect-server
    launchctl print gui/$(id -u)/org.echodataflow.prefect-worker
-   tail -f ~/.local/var/log/echodataflow/prefect-worker.err.log
+   tail -f ~/.local/var/log/echodataflow/prefect-server.err.log  # check server error logs
+   tail -f ~/.local/var/log/echodataflow/prefect-worker.err.log  # check worker error logs
    ```
 
 
