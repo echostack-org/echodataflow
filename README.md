@@ -88,6 +88,46 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
 6. Start up system services that hosts the 2 sets of visualization
 
 
+## Running Local Prefect Services on macOS (launchd)
+
+To run a local Prefect server and worker as background services on macOS, you can
+use launchd with the provided plist templates:
+
+- `src/echodataflow/services/deploy_prefect_server.launchd.plist`
+- `src/echodataflow/services/deploy_prefect_worker.launchd.plist`
+
+These templates intentionally use direct one-line `ProgramArguments` commands, similar
+to `.service` `ExecStart` usage, with no wrapper shell script required.
+
+1. Copy and customize the templates for your user:
+   ```shell
+   mkdir -p ~/Library/LaunchAgents ~/.local/var/log/echodataflow
+   cp src/echodataflow/services/deploy_prefect_server.launchd.plist ~/Library/LaunchAgents/org.echodataflow.prefect-server.plist
+   cp src/echodataflow/services/deploy_prefect_worker.launchd.plist ~/Library/LaunchAgents/org.echodataflow.prefect-worker.plist
+   ```
+
+2. Edit both copied plist files as needed:
+   - Set username path to the actual username
+   - Adjust mamba executable path
+   - Adjust conda environment name
+   - Adjust worker pool name if not using `local`.
+
+3. Load and start services:
+   ```shell
+   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-server.plist
+   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-worker.plist
+   launchctl kickstart -k gui/$(id -u)/org.echodataflow.prefect-server
+   launchctl kickstart -k gui/$(id -u)/org.echodataflow.prefect-worker
+   ```
+
+4. Check status and logs:
+   ```shell
+   launchctl print gui/$(id -u)/org.echodataflow.prefect-server
+   launchctl print gui/$(id -u)/org.echodataflow.prefect-worker
+   tail -f ~/.local/var/log/echodataflow/prefect-worker.err.log
+   ```
+
+
 
 ## License
 
