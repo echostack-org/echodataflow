@@ -4,7 +4,7 @@ In this section, we will have a look at the pipeline configuration that we'll be
 Here's the configuration we'll be using:
 
 ```yaml
-active_recipe: target_strength 
+active_recipe: target_strength
 use_local_dask: true
 n_workers: 5
 pipeline:

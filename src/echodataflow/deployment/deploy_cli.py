@@ -29,14 +29,14 @@ from echodataflow.deployment.deployment_engine import (
 def _run_concurrency_setup(filtered_flows: dict[str, dict[str, Any]]) -> None:
     """Run set_concurrency_limit for modules with flows in filtered_flows."""
     seen_modules = set()
-    
+
     for flow_info in filtered_flows.values():
         flow_module = flow_info["flow_module"]
         module_name = id(flow_module)  # use object id to track unique modules
         if module_name in seen_modules:
             continue
         seen_modules.add(module_name)
-        
+
         setup_fn = getattr(flow_module, "set_concurrency_limit", None)
         if not callable(setup_fn):
             continue

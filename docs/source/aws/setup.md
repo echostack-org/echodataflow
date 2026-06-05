@@ -85,8 +85,8 @@ Create an S3 bucket to store the processed output. Refer to the [AWS S3] (https:
 # ...rest of the cofiguration
 output: # Output arguments
   urlpath: <YOUR_S3_URI> # Destination data URL parameters
-  overwrite: true 
-  storage_options: 
+  overwrite: true
+  storage_options:
     block_name: echodataflow-aws-credentials
     type: AWS
 ```
@@ -111,7 +111,7 @@ provider=AWS
 
 ## Step 7: Create Credential blocks
 
-Once you have stored the credentials in the ini file, call the below command to create a block securedly stored in your prefect account. For more about blocks refer [Blocks] (https://github.com/echostack-org/echodataflow/blob/dev/docs/configuration/blocks.md). 
+Once you have stored the credentials in the ini file, call the below command to create a block securedly stored in your prefect account. For more about blocks refer [Blocks] (https://github.com/echostack-org/echodataflow/blob/dev/docs/configuration/blocks.md).
 
 ```bash
 echodataflow load-credentials
@@ -120,7 +120,7 @@ echodataflow load-credentials
 ---
 
 ## Step 8: Jupyter Notebook
-Open Jupyter Notebook using terminal in the same activated environment 
+Open Jupyter Notebook using terminal in the same activated environment
 
 ```bash
 jupyter notebook

@@ -31,8 +31,8 @@ cd ~/.echodataflow
 nano credentials.ini # Or use any of your favourite editors
 ```
 3. Store the updated `.ini` file in the `.echodataflow` directory, which resides in your home directory.
-4. Utilize [echodataflow load-credentials](../../echodataflow/echodataflow_cli.py) command to generate a new credential block, leveraging the content from the `.ini` file. 
-```bash 
+4. Utilize [echodataflow load-credentials](../../echodataflow/echodataflow_cli.py) command to generate a new credential block, leveraging the content from the `.ini` file.
+```bash
 echodataflow load-credentials
 ```
 5. Add the name of the block in pipeline or datastore yaml configuration files under `storage_options` section with the appropriate storage type (refer [StorageType](../../echodataflow//models/datastore.py)).
@@ -46,7 +46,7 @@ storage_options:
 
 By providing the block name and storage type, ensure that the correct block is used for storage operations, and maintain clarity regarding the chosen storage type.
 
-Once a credential block is created, it can be managed through the Prefect Dashboard. Additionally, if needed, you can use the `echodataflow load-credentials` command with the `--sync` argument to ensure your blocks stay up-to-date with any changes made in the Prefect UI. This ensures that your configurations remain accurate and aligned across the application. **It is highly recommended to create new blocks whenever possible, as modifying existing blocks can lead to data loss or conflicts.** 
+Once a credential block is created, it can be managed through the Prefect Dashboard. Additionally, if needed, you can use the `echodataflow load-credentials` command with the `--sync` argument to ensure your blocks stay up-to-date with any changes made in the Prefect UI. This ensures that your configurations remain accurate and aligned across the application. **It is highly recommended to create new blocks whenever possible, as modifying existing blocks can lead to data loss or conflicts.**
 
 ## Considerations When Using `echodataflow load-credentials`
 
@@ -102,4 +102,3 @@ connection_string = my-connection-string
 active = True
 option_key = option_value
 ```
-

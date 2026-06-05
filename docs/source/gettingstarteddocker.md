@@ -26,7 +26,7 @@ docker run --network="host" -e PREFECT_API_URL=http://host.docker.internal:4200/
 ### Important Note on Configuration
 The `PREFECT_API_URL` environment variable is essential for connecting the Docker container to a Prefect dashboard, enabling the monitoring and triggering of flows externally. This URL can be configured in two primary ways:
 
-- Local Prefect Server:  
+- Local Prefect Server:
 
 Start a local server using the command:
 

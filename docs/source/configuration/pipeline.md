@@ -87,8 +87,8 @@ pipeline: # List of pipeline configurations; only the active_recipe will be exec
       save_raw_file: true # Save the downloaded raw file to output directory. Refer <link> for more information on how to configure output directory.
       use_raw_offline: true # Skip the download process and take the raw file present in the output directory. Note: Missing files will be downloaded in the output directory.
       use_offline: true # Skip this process if zarr files are already present in the output directory.
-      out_path: ./temp_files # Configure the output directory for this process 
-    prefect_config: # Configure any prefect related settings for a flow. For an exhaustive list of configurations refer <https://docs.prefect.io/2.11.5/concepts/flows/#flow-settings>. Task based configurations are optimized and handled by echodataflow 
+      out_path: ./temp_files # Configure the output directory for this process
+    prefect_config: # Configure any prefect related settings for a flow. For an exhaustive list of configurations refer <https://docs.prefect.io/2.11.5/concepts/flows/#flow-settings>. Task based configurations are optimized and handled by echodataflow
       retries: 3 # Number of retries before failing the flow
       task_runner: DaskTaskRunner(address=tcp://127.0.0.1:59487) # Configure Runner setting for this specific stage
       persist_result: true # Persist the prefect results. Note: By default the output will be stored in the output directory, this option should only be used if dealing with advanced prefect configuration and integration
@@ -112,10 +112,10 @@ pipeline: # List of pipeline configurations; only the active_recipe will be exec
     options:
       use_offline: true
     external_params:
-      range_meter_bin: 20m 
+      range_meter_bin: 20m
       ping_time_bin: 20S
 ```
 
 Here are a couple of example configurations used during the demo:
-1. [Local Configuration](../local/pipelineconfiguration.md) 
+1. [Local Configuration](../local/pipelineconfiguration.md)
 2. [AWS Configuration](../aws/pipelineconfiguration.md)

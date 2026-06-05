@@ -90,7 +90,7 @@ def get_MVBS_tensor(ds_in, freq_wanted=[120000, 38000, 18000]):
     mvbs_tensor_clip_normalized = (
         (mvbs_tensor_clip - (-70.0)) / (-36.0 - (-70.0)) * 255.0
     )
-    
+
     return mvbs_tensor_clip_normalized.unsqueeze(0).float()
 
 
@@ -268,7 +268,7 @@ def flow_raw2Sv(
             columns=["raw_filename", "Sv_filename", "first_ping_time", "last_ping_time"]
         )
         print(df_new)
-        
+
         # Concatenate with existing df_Sv and save
         df_Sv = pd.concat([df_Sv, df_new], ignore_index=True)
         df_Sv.sort_values(
@@ -330,7 +330,7 @@ def task_raw2Sv(
         echodata=ed,
         nmea_sentence=nmea_sentence,
     )
-    
+
     # Save to zarr
     out_path = Path(path_Sv_zarr) / f"{Path(raw_path).stem}_Sv.zarr"
     ds_Sv.to_zarr(
@@ -341,7 +341,7 @@ def task_raw2Sv(
     )
 
     return (
-        out_path.name, 
+        out_path.name,
         pd.to_datetime(ds_Sv["ping_time"][0].values),
         pd.to_datetime(ds_Sv["ping_time"][-1].values)
     )
@@ -707,7 +707,7 @@ async def flow_predict_hake(
         # Skip prediction if no MVBS files found
         if len(MVBS_filenames) == 0:
             logger.info(f"No MVBS files found for slice {snum+1}, skipping")
-            continue        
+            continue
 
         # Predict on the MVBS files and compute NASC
         try:
@@ -740,7 +740,7 @@ async def flow_predict_hake(
             # Compute NASC directly from the prediction
             task_compute_NASC.with_options(
                 task_run_name=f"NASC_{predict_filename_postfix}",
-                name=f"NASC_{predict_filename_postfix}",                
+                name=f"NASC_{predict_filename_postfix}",
             )(
                 NASC_filename=f"NASC_{predict_filename_postfix}.zarr",
                 ds_MVBS_combine=ds_MVBS_combine,
@@ -761,7 +761,7 @@ async def flow_predict_hake(
         except Exception as e:
             errors.append(e)
             logger.error(f"Error during prediction for slice {snum+1}: {e}")
-        
+
         # Save updated prediction info dataframe
         df_prediction.to_csv(file_prediction_csv, date_format="%Y-%m-%dT%H:%M:%S")
 

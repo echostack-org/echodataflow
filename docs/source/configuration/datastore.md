@@ -66,7 +66,7 @@ args: # Input arguments
     grouping_regex: x(?P<transect_num>\d+) # Regex to parse group name from the filename. Skip if you want everything into default group or entire file name as group name
     storage_options: # Transect file storage options
       block_name: echodataflow-aws-credentials # Block name. For more information on Blocks refer blocks.md
-      type: AWS # Block type 
+      type: AWS # Block type
   group_name: default_group # Set when not using a file to pass transect information or group all files under one group. Skip if you want file name as group name.
   json_export: true # Export raw json metadata of files to be processed
   raw_json_path: s3://echodataflow-workground/combined_files/raw_json # Path to store the raw json metadata. Can also work to skip the process of parsing the files at source directory and fetch files present in this json instead.
@@ -86,7 +86,5 @@ logging:
 
 
 Here are a couple of example configurations used during the demo:
-1. [Local Configuration](../local/datastoreconfiguration.md) 
+1. [Local Configuration](../local/datastoreconfiguration.md)
 2. [AWS Configuration](../aws/datastoreconfiguration.md)
-
-

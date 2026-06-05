@@ -19,7 +19,7 @@ def utm_string_generator(longitude: float, latitude: float):
         Longitude coordinate
     latitude: float
         Latitude coordinate
-        
+
     Returns
     -------
     str
@@ -42,14 +42,14 @@ def utm_string_generator(longitude: float, latitude: float):
 def create_boundary_gdf(bounds, projection="epsg:4326"):
     """
     Create a GeoDataFrame for the boundary rectangle from coordinate bounds
-    
+
     Parameters
     ----------
     bounds : dict
         Dictionary with 'latitude' and 'longitude' keys, each containing [min, max]
     projection : str, default="epsg:4326"
         CRS projection string
-        
+
     Returns
     -------
     tuple
@@ -58,7 +58,7 @@ def create_boundary_gdf(bounds, projection="epsg:4326"):
     # Get boundary coordinates
     x = bounds["longitude"]
     y = bounds["latitude"]
-    
+
     # Create DataFrame with box corners
     boundary_df = pd.DataFrame(
         {
@@ -81,18 +81,18 @@ def create_boundary_gdf(bounds, projection="epsg:4326"):
     )
     utm_num = int(utm_code)
     boundary_gdf_utm = boundary_gdf.to_crs(utm_num)
-    
+
     return boundary_gdf, boundary_gdf_utm, utm_num
 
 def get_resolution_meters(resolution):
     """
     Convert nautical mile resolution to meters
-    
+
     Parameters
     ----------
     resolution : dict
         Dictionary with 'x_distance' and 'y_distance' in nautical miles
-        
+
     Returns
     -------
     dict
@@ -103,7 +103,7 @@ def get_resolution_meters(resolution):
 def create_grid_cells(boundary_gdf_utm: gpd.GeoDataFrame, x_step: float, y_step: float):
     """
     Generate grid cells based on boundary and step sizes
-    
+
     Parameters
     ----------
     boundary_gdf_utm : GeoDataFrame
@@ -112,7 +112,7 @@ def create_grid_cells(boundary_gdf_utm: gpd.GeoDataFrame, x_step: float, y_step:
         Cell width in meters
     y_step : float
         Cell height in meters
-        
+
     Returns
     -------
     GeoDataFrame
@@ -120,13 +120,13 @@ def create_grid_cells(boundary_gdf_utm: gpd.GeoDataFrame, x_step: float, y_step:
     """
     # Get new boundaries
     xmin, ymin, xmax, ymax = boundary_gdf_utm.total_bounds
-    
+
     # Initialize variables
     grid_cells = []
     y_ct = 0
     x_coord = []
     y_coord = []
-    
+
     # Generate grid cells
     for y0 in np.arange(ymin, ymax, y_step):
         y_ct += 1
@@ -145,13 +145,13 @@ def create_grid_cells(boundary_gdf_utm: gpd.GeoDataFrame, x_step: float, y_step:
     cells_gdf = gpd.GeoDataFrame(grid_cells, columns=["geometry"], crs=boundary_gdf_utm.crs)
     cells_gdf.loc[:, "grid_x"] = np.array(x_coord)
     cells_gdf.loc[:, "grid_y"] = np.array(y_coord)
-    
+
     return cells_gdf
 
 def get_coastline(boundary_gdf, resolution='10m', projection="epsg:4326"):
     """
     Get coastline data from cartopy and clip to boundary
-    
+
     Parameters
     ----------
     boundary_gdf : GeoDataFrame
@@ -160,7 +160,7 @@ def get_coastline(boundary_gdf, resolution='10m', projection="epsg:4326"):
         Cartopy resolution ('10m', '50m', or '110m')
     projection : str, default="epsg:4326"
         CRS projection string
-        
+
     Returns
     -------
     tuple
@@ -183,18 +183,18 @@ def get_coastline(boundary_gdf, resolution='10m', projection="epsg:4326"):
     )
     coast_geometries = list(coast_feature.geometries())
     full_coast = gpd.GeoDataFrame(geometry=coast_geometries, crs=projection)
-    
+
     # Clip the coastline
     clipped_coast_original = gpd.clip(
         full_coast, sg.box(xmin0 + 1, ymin0 + 1, xmax0 + 1, ymax0 + 1)
     )
-    
+
     return full_coast, clipped_coast_original, boundary_box_unbuffered_gdf
 
 def clip_grid_with_coastline(cells_gdf, full_coast, utm_code, boundary_box):
     """
     Clip grid cells to remove land areas
-    
+
     Parameters
     ----------
     cells_gdf : GeoDataFrame
@@ -205,7 +205,7 @@ def clip_grid_with_coastline(cells_gdf, full_coast, utm_code, boundary_box):
         UTM EPSG code
     boundary_box : Polygon
         Boundary box for clipping
-        
+
     Returns
     -------
     GeoDataFrame
@@ -215,19 +215,19 @@ def clip_grid_with_coastline(cells_gdf, full_coast, utm_code, boundary_box):
     full_coast_utm = full_coast.to_crs(utm_code)
     full_coast_utm = full_coast_utm[~full_coast_utm.is_empty]
     clipped_coast = gpd.clip(full_coast, boundary_box).to_crs(utm_code)
-    
+
     # Clip the grid cells (remove land areas)
     cells_gdf.loc[:, "geometry"] = cells_gdf["geometry"].difference(
         clipped_coast.geometry.union_all()
     )
-    
+
     return clipped_coast
 
 
 def calculate_cell_areas(cells_gdf, boundary_box_unbuffered_gdf, projection="epsg:4326"):
     """
     Calculate cell areas and convert back to original projection
-    
+
     Parameters
     ----------
     cells_gdf : GeoDataFrame
@@ -236,7 +236,7 @@ def calculate_cell_areas(cells_gdf, boundary_box_unbuffered_gdf, projection="eps
         Boundary box for clipping
     projection : str, default="epsg:4326"
         Target projection
-        
+
     Returns
     -------
     GeoDataFrame
@@ -251,20 +251,20 @@ def calculate_cell_areas(cells_gdf, boundary_box_unbuffered_gdf, projection="eps
     clipped_cells_latlon = gpd.clip(
         cells_gdf.to_crs(projection), boundary_box_unbuffered_gdf
     ).reset_index(drop=True)
-    
+
     return clipped_cells_latlon
 
 def filter_grid_cells(clipped_cells_latlon, area_threshold=10):
     """
     Filter grid cells based on area and validity
-    
+
     Parameters
     ----------
     clipped_cells_latlon : GeoDataFrame
         Grid cells
     area_threshold : float, default=10
         Minimum area in square nautical miles
-        
+
     Returns
     -------
     GeoDataFrame
@@ -275,13 +275,13 @@ def filter_grid_cells(clipped_cells_latlon, area_threshold=10):
         (clipped_cells_latlon.is_valid) &
         (~clipped_cells_latlon.is_empty)
     ].reset_index(drop=True)
-    
+
     return filtered_cells
 
 def plot_grid(cells_gdf, coastline=None, boundary_gdf=None, figsize=(10, 10)):
     """
     Plot grid cells with optional coastline and boundary
-    
+
     Parameters
     ----------
     cells_gdf : GeoDataFrame
@@ -292,39 +292,39 @@ def plot_grid(cells_gdf, coastline=None, boundary_gdf=None, figsize=(10, 10)):
         Boundary box
     figsize : tuple, default=(10, 10)
         Figure size
-        
+
     Returns
     -------
     tuple
         (fig, ax) matplotlib figure and axes
     """
     fig, ax = plt.subplots(figsize=figsize)
-    
+
     # Plot cells with area color
     plot = cells_gdf.plot(
-        column="area", 
-        ax=ax, 
-        legend=False, 
-        cmap="viridis", 
-        edgecolor='k', 
-        linewidth=0.2, 
+        column="area",
+        ax=ax,
+        legend=False,
+        cmap="viridis",
+        edgecolor='k',
+        linewidth=0.2,
         markersize=0
     )
-    
+
     # Add colorbar with proper spacing
     cbar = fig.colorbar(plot.get_children()[0], ax=ax, pad=0.02)
     cbar.set_label('Area (nmi²)')
-    
+
     # Plot coastline if provided
     if coastline is not None:
         coastline.plot(
-            ax=ax, 
-            color='lightgray', 
-            edgecolor='black', 
-            linewidth=0.5, 
+            ax=ax,
+            color='lightgray',
+            edgecolor='black',
+            linewidth=0.5,
             label='Coastline'
         )
-    
+
     # Plot boundary if provided
     if boundary_gdf is not None:
         # Set plot limits to boundary
@@ -332,7 +332,7 @@ def plot_grid(cells_gdf, coastline=None, boundary_gdf=None, figsize=(10, 10)):
             bounds = boundary_gdf.geometry.iloc[0].bounds
             ax.set_xlim(bounds[0], bounds[2])
             ax.set_ylim(bounds[1], bounds[3])
-    
+
     # Add labels and title
     plt.title("Grid Cell Areas (nmi²)")
     plt.xlabel("Longitude")
@@ -340,13 +340,13 @@ def plot_grid(cells_gdf, coastline=None, boundary_gdf=None, figsize=(10, 10)):
 
     # Adjust layout to ensure nothing is cropped
     plt.tight_layout()
-    
+
     return fig, ax
 
 def save_grid(cells_gdf, filepath):
     """
     Save grid cells to CSV file
-    
+
     Parameters
     ----------
     cells_gdf : GeoDataFrame
@@ -359,14 +359,14 @@ def save_grid(cells_gdf, filepath):
 def load_grid_from_csv(filepath, projection="epsg:4326"):
     """
     Load grid cells from CSV file with WKT geometry
-    
+
     Parameters
     ----------
     filepath : str
         Input CSV file path
     projection : str, default="epsg:4326"
         CRS projection string
-        
+
     Returns
     -------
     GeoDataFrame
@@ -387,7 +387,7 @@ def create_grid_from_bounds(
 ):
     """
     Create a complete grid from bounds and resolution
-    
+
     Parameters
     ----------
     bounds : dict
@@ -400,7 +400,7 @@ def create_grid_from_bounds(
         Cartopy resolution ('10m', '50m', or '110m')
     area_threshold : float, default=10
         Minimum area in square nautical miles
-        
+
     Returns
     -------
     tuple
@@ -408,32 +408,32 @@ def create_grid_from_bounds(
     """
     # Create boundary and convert to UTM
     boundary_gdf, boundary_gdf_utm, utm_code = create_boundary_gdf(bounds, projection)
-    
+
     # Get grid resolution in meters
     resolution_m = get_resolution_meters(resolution)
     x_step = resolution_m["x_distance"]
     y_step = resolution_m["y_distance"]
-    
+
     # Create grid cells
     cells_gdf = create_grid_cells(boundary_gdf_utm, x_step, y_step)
-    
+
     # Get coastline data
     full_coast, clipped_coast_original, boundary_box_unbuffered_gdf = get_coastline(
         boundary_gdf, coastline_resolution, projection
     )
-    
+
     # Create boundary box for clipping
     xmin0, ymin0, xmax0, ymax0 = boundary_gdf.total_bounds
     boundary_box = sg.box(xmin0 - 5, ymin0 - 5, xmax0 + 5, ymax0 + 5)
-    
+
     # Clip grid with coastline
     coastline_clipped = clip_grid_with_coastline(cells_gdf, full_coast, utm_code, boundary_box)
-    
+
     # Calculate areas and convert back to lat/lon
     clipped_cells_latlon = calculate_cell_areas(cells_gdf, boundary_box_unbuffered_gdf, projection)
-    
+
     # Filter small or invalid cells
     if area_threshold > 0:
         clipped_cells_latlon = filter_grid_cells(clipped_cells_latlon, area_threshold)
-    
+
     return clipped_cells_latlon, coastline_clipped, boundary_box_unbuffered_gdf

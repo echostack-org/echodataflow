@@ -37,7 +37,7 @@ handlers:
     log_group_name: echodataflow_logs
     log_stream_name: echodataflow_stream
     send_interval: 10
-    create_log_group: False  
+    create_log_group: False
 loggers:
   echodataflow:
     level: DEBUG

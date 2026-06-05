@@ -1,7 +1,7 @@
 name: Bell_M._Shimada-SH1707-EK60
-sonar_model: EK60 
-raw_regex: (.*)-?D(?P<date>\w{1,8})-T(?P<time>\w{1,6}) 
-args: 
+sonar_model: EK60
+raw_regex: (.*)-?D(?P<date>\w{1,8})-T(?P<time>\w{1,6})
+args:
   urlpath: s3://ncei-wcsd-archive/data/raw/{{ ship_name }}/{{ survey_name }}/{{ sonar_model }}/*.raw
   parameters:
     ship_name: Bell_M._Shimada
@@ -12,8 +12,8 @@ args:
   group:
     file: ./EK60_SH1707_Shimada.txt
   group_name: 2017
-  json_export: true 
-output: 
+  json_export: true
+output:
   urlpath: ./echodataflow-output
   retention: true
   overwrite: true

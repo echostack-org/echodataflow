@@ -4,18 +4,18 @@ In this section, we will provide you with the pipeline configuration that we'll 
 Here's the configuration we'll be using:
 
 ```yaml
-active_recipe: standard 
+active_recipe: standard
 use_local_dask: true
 n_workers: 3
 pipeline:
-- recipe_name: standard 
-  stages: 
-  - name: echodataflow_open_raw 
-    module: echodataflow.stages.subflows.open_raw 
-    options: 
+- recipe_name: standard
+  stages:
+  - name: echodataflow_open_raw
+    module: echodataflow.stages.subflows.open_raw
+    options:
       save_raw_file: true
-      use_raw_offline: true 
-      use_offline: true 
+      use_raw_offline: true
+      use_offline: true
   - name: echodataflow_combine_echodata
     module: echodataflow.stages.subflows.combine_echodata
     options:
@@ -29,11 +29,11 @@ pipeline:
     options:
       use_offline: true
     external_params:
-      range_meter_bin: 20 
+      range_meter_bin: 20
       ping_time_bin: 20S
 
 ```
-    
+
 <!-- Let's break down the components of this configuration:
 
 - **active_recipe**: Specifies the recipe to be used for processing, which is set as "standard" in this case.
@@ -45,11 +45,11 @@ pipeline:
 - **pipeline**: This section defines the sequence of stages to execute. In this example, we're following the "standard" recipe, which comprises four stages.
 
     - **echodataflow_open_raw**: This stage utilizes the `open_raw` subflow module to open raw data files. It includes options such as saving raw files, using raw data in offline mode, and utilizing offline data.
-    
+
     - **echodataflow_combine_echodata**: This stage employs the `combine_echodata` subflow module to combine echodatas based on transect. It includes an option to use offline data.
-    
+
     - **compute_Sv**: This stage employs the `compute_Sv` subflow module to compute Backscattering Strength. It includes an option to use offline data.
-    
+
     - **compute_MVBS**: This stage employs the `compute_MVBS` subflow module to calculate MVBS. It includes an option to use offline data. -->
 
 **Note**: For a more comprehensive understanding of each option and its functionality, you can refer to the [Pipeline documentation](../configuration/pipeline.md).

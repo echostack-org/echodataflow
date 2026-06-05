@@ -37,41 +37,41 @@ def discover_all_flows() -> dict[str, dict[str, Any]]:
     Returns mapping: flow_name -> {"flow_obj", "module_name", "entrypoint"}
     """
     import os
-    
+
     flows_pkg_spec = importlib.util.find_spec("echodataflow.flows") # this points to __init__.py
     if flows_pkg_spec is None or flows_pkg_spec.origin is None:
         raise ValueError("Could not locate echodataflow.flows package")
-    
+
     flows_dir = Path(flows_pkg_spec.origin).parent  # this points to src/echodataflow/flows
     discovered: dict[str, dict[str, Any]] = {}
-    
+
     # Find all .py files in flows directory (excluding __init__.py)
     for py_file in flows_dir.glob("*.py"):
         if py_file.name.startswith("_"):
             continue
-        
+
         module_name = py_file.stem  # filename without .py
         try:
             flow_module = importlib.import_module(f"echodataflow.flows.{module_name}")
         except ImportError as e:
             raise ImportError(f"Failed to import echodataflow.flows.{module_name}: {e}")
-        
+
         # Find all flow_* attributes in the module
         for attr_name in dir(flow_module):
             if not attr_name.startswith("flow_"):
                 continue
-            
+
             flow_name = attr_name.removeprefix("flow_")
             flow_obj = cast(Flow[..., Any], getattr(flow_module, attr_name))
             entrypoint = f"{DEFAULT_ENTRYPOINT_ROOT}/{module_name}.py:{attr_name}"
-            
+
             discovered[flow_name] = {
                 "flow_obj": flow_obj,
                 "module_name": module_name,
                 "flow_module": flow_module,
                 "entrypoint": entrypoint,
             }
-    
+
     return discovered
 
 
@@ -84,7 +84,7 @@ def filter_flows_for_deploy(all_flows: dict[str, dict[str, Any]], deploy_cfg: di
     """
     filtered: dict[str, dict[str, Any]] = {}
     flow_name_map = {f"flow_{name}": flow_info for name, flow_info in all_flows.items()}
-    
+
     for flow_key, deploy_meta in deploy_cfg.get("flows", {}).items():
         requested_name = f"flow_{flow_key}"
         alias_name: str | None = None
@@ -106,7 +106,7 @@ def filter_flows_for_deploy(all_flows: dict[str, dict[str, Any]], deploy_cfg: di
                 f"Available flows: {available}"
             )
         filtered[flow_key] = flow_name_map[matched_name]
-    
+
     return filtered
 
 
@@ -137,7 +137,7 @@ def _default_local_source_root() -> Path:
 
 def _validate_local_source_layout(local_source_root: Path) -> Path:
     """
-    Validate the local source root and entrypoint exists 
+    Validate the local source root and entrypoint exists
     and return the root to use for local deployments.
     """
     root = local_source_root.resolve()
@@ -238,7 +238,7 @@ def set_prefect_variables(
 ) -> None:
     """Set Prefect Variables from deploy and param specifications."""
     Variable.set("flow_start_time", deploy_cfg.get("flow_start_time"), overwrite=True)
-    
+
     init_dict = param_cfg.get("init", {})
     Variable.set("counter_raw_copy", init_dict.get("counter_raw_copy"), overwrite=True)
 

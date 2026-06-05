@@ -2,8 +2,8 @@
   <a href="https://echodataflow.readthedocs.io/en/latest/?badge=latest">
     <img src="https://readthedocs.org/projects/echodataflow/badge/?version=latest"/>
   </a>
-  <a href="https://codecov.io/gh/echostack-org/echodataflow" > 
- <img src="https://codecov.io/gh/echostack-org/echodataflow/graph/badge.svg?token=YTMVVHG585"/> 
+  <a href="https://codecov.io/gh/echostack-org/echodataflow" >
+ <img src="https://codecov.io/gh/echostack-org/echodataflow/graph/badge.svg?token=YTMVVHG585"/>
  </a>
 </div> -->
 
@@ -24,7 +24,7 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
    conda activate echodataflow
    ```
 
-2. If you would like to run Echodataflow as an installed package, 
+2. If you would like to run Echodataflow as an installed package,
    install it from the repo like below:
    ```bash
    pip install git+https://github.com/echostack-org/echodataflow.git  # install from repo
@@ -35,7 +35,7 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
    git clone git+https://github.com/echostack-org/echodataflow.git  # clone the repo
    pip install -e .[test,lint,docs]  # install in editable mode with dev tools
    ```
-   
+
 
 
 ## Running the edge pipeline

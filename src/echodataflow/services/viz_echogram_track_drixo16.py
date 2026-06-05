@@ -36,7 +36,7 @@ def multi_freq_app():
     # Create initial plot
     egram = update_cache_multi_freq()
     plot_pane = pn.pane.HoloViews(egram)
-    
+
     # Simple update function that only runs every 10 minutes
     def scheduled_update():
         try:
@@ -45,13 +45,13 @@ def multi_freq_app():
             print("Plot updated at scheduled interval")
         except Exception as e:
             print(f"Error during scheduled update: {e}")
-    
+
     # Add ONLY the 10-minute callback - no other automatic updates
     pn.state.add_periodic_callback(
         scheduled_update,
         period=10*60*1000  # Update every 10 mins
     )
-    
+
     return plot_pane
 
 
@@ -85,7 +85,7 @@ def tricolor_app():
     # Create initial plot
     tricolor = update_cache_tricolor()
     plot_pane = pn.pane.HoloViews(tricolor)
-    
+
     # Simple update function that only runs every 10 minutes
     def scheduled_update():
         try:
@@ -94,13 +94,13 @@ def tricolor_app():
             print("Plot updated at scheduled interval")
         except Exception as e:
             print(f"Error during scheduled update: {e}")
-    
+
     # Add ONLY the 10-minute callback - no other automatic updates
     pn.state.add_periodic_callback(
         scheduled_update,
         period=10*60*1000  # Update every 10 mins
     )
-    
+
     return plot_pane
 
 

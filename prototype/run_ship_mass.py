@@ -38,7 +38,7 @@ def get_start_end_times(file_path):
         df["last_ping_time"] = df["last_ping_time"].dt.tz_localize("UTC")
     if df["first_ping_time"].dt.tz is None:
         df["first_ping_time"] = df["first_ping_time"].dt.tz_localize("UTC")
-    return df["first_ping_time"].iloc[0], df["last_ping_time"].iloc[-1] 
+    return df["first_ping_time"].iloc[0], df["last_ping_time"].iloc[-1]
 
 
 # Run flow_create_MVBS for all possible slices

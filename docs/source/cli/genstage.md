@@ -64,7 +64,7 @@ def echodataflow_example_stage(
 def process_example_stage(
     config: Dataset, stage: Stage, out_data: Union[Dict, Output], working_dir: str
 ):
-    
+
     file_name = ed.filename + "_example stage.zarr"
     try:
         out_zarr = get_out_zarr(
@@ -88,7 +88,7 @@ def process_example_stage(
                 consolidated=True,
                 storage_options=config.output.storage_options_dict,
             )
-        
+
         ed.out_path = out_zarr
         ed.error = ErrorObject(errorFlag=False)
     except Exception as e:

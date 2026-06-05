@@ -146,7 +146,7 @@ def test_deploy_cli_cloud_characterization(monkeypatch, tmp_path, install_prefec
             "flow_module": flow_module,
             "entrypoint": entrypoint,
         }
-    
+
     # Mock the discovery functions in the deploy_cli module
     monkeypatch.setattr(module, "discover_all_flows", lambda: filtered)
     monkeypatch.setattr(module, "filter_flows_for_deploy", lambda all_flows, cfg: {k: filtered[k] for k in cfg["flows"].keys()})
@@ -290,7 +290,7 @@ def test_deploy_cli_ship_characterization(monkeypatch, tmp_path, install_prefect
             "flow_module": flow_module,
             "entrypoint": entrypoint,
         }
-    
+
     # Mock the discovery functions in the deploy_cli module
     monkeypatch.setattr(module, "discover_all_flows", lambda: filtered)
     monkeypatch.setattr(module, "filter_flows_for_deploy", lambda all_flows, cfg: {k: filtered[k] for k in cfg["flows"].keys()})

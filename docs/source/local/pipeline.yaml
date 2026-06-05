@@ -1,4 +1,4 @@
-active_recipe: target_strength 
+active_recipe: target_strength
 use_local_dask: true
 n_workers: 5
 pipeline:

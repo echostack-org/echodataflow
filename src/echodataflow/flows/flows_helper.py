@@ -34,7 +34,7 @@ def flow_file_upload(
         List of subdirectories to exclude from the upload, by default [].
     max_age : int, optional
         Maximum age of files to upload in hours, by default -1 (no limit).
-    """ 
+    """
     # TODO: need to fix dependency issue
     # TODO: consider moving it back to top imports
     from prefect_shell import ShellOperation
@@ -55,9 +55,9 @@ def flow_file_upload(
 
     # Potentially long running so using a context manager
     if max_age == -1:
-        command = f"rclone copy -v --no-traverse {src_dir} {dest_dir} --exclude-from {str(exclude_path)}" 
+        command = f"rclone copy -v --no-traverse {src_dir} {dest_dir} --exclude-from {str(exclude_path)}"
     else:
-        command = f"rclone copy -v --max-age 2h --no-traverse {src_dir} {dest_dir} --exclude-from {str(exclude_path)}" 
+        command = f"rclone copy -v --max-age 2h --no-traverse {src_dir} {dest_dir} --exclude-from {str(exclude_path)}"
     print("command:", command)
     with ShellOperation(commands=[command], working_dir=src_dir) as file_upload_operation:
 
@@ -118,10 +118,10 @@ def flow_copy_raw(
 
     # Configure anonymous access
     s3 = boto3.client('s3', config=Config(signature_version=UNSIGNED))
-    
+
     # Copy file
     bucket = "noaa-wcsd-pds"
-    path_s3 = f"{path_s3}/{filename}"    
+    path_s3 = f"{path_s3}/{filename}"
     s3.download_file(bucket, path_s3, Path(path_copy) / f"{filename}")
 
     # Increment ocunter

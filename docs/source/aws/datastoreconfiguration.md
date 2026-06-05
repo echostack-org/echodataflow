@@ -6,9 +6,9 @@ Here's the detailed breakdown of the configuration:
 
 ```yaml
 name: Bell_M._Shimada-SH1707-EK60
-sonar_model: EK60 
-raw_regex: (.*)-?D(?P<date>\w{1,8})-T(?P<time>\w{1,6}) 
-args: 
+sonar_model: EK60
+raw_regex: (.*)-?D(?P<date>\w{1,8})-T(?P<time>\w{1,6})
+args:
   urlpath: s3://ncei-wcsd-archive/data/raw/{{ ship_name }}/{{ survey_name }}/{{ sonar_model }}/*.raw
   parameters:
     ship_name: Bell_M._Shimada
@@ -19,12 +19,12 @@ args:
   group:
     file: ./EK60_SH1707_Shimada.txt
     group_name: 2017
-  json_export: true 
-output: 
+  json_export: true
+output:
   urlpath: <YOUR-S3-BUCKET>
   retention: false
   overwrite: true
-  storage_options: 
+  storage_options:
     block_name: echodataflow-aws-credentials
     type: AWS
 ```
@@ -55,7 +55,7 @@ output:
 
   - **overwrite**: Allows data overwriting if the data already exists. -->
 
-**Note**: 
+**Note**:
 - For a more comprehensive understanding of each option and its functionality, you can refer to the [Datastore documentation](../configuration/datastore.md/).
 - The pipeline will store MVBS Strength output under `<YOUR-S3-BUCKET>`. As the retention is set to false, only MVBS Strength files will be stored. To specify files for processing, create a list of file names and store it in `EK60_SH1707_Shimada.txt`, which should be placed under the transect directory.
 

@@ -30,7 +30,7 @@ NASC_path = "nasc_zarr"
 
 # Create boundary GeoDataFrame with UTM projection
 gdf_boundary, gdf_boundary_utm, utm_num = create_boundary_gdf(
-    bounds=GRID_PARAMS["bounds"], 
+    bounds=GRID_PARAMS["bounds"],
     projection=GRID_PARAMS["projection"]
 )
 
@@ -232,10 +232,10 @@ def flow_ingest_NASC(
         df_NASC_all = add_stratum(df_NASC_all, df_stratum)
         df_NASC_all["stratum"] = df_NASC_all["stratum"].astype("Int64")  # convert from category to int
 
-        # Merge on stratum 
+        # Merge on stratum
         df_NASC_all = df_NASC_all.merge(
             df_stratum[["stratum", "sigma_bs_mean", "weight_mean"]],
-            on="stratum",  # merge on stratum 
+            on="stratum",  # merge on stratum
             how="left"
         )
 
@@ -287,7 +287,7 @@ def flow_update_grid(
 
     # Create gdf_grid_cells
     gdf_grid_cells, _, _ = create_grid_from_bounds(
-        bounds=GRID_PARAMS["bounds"], 
+        bounds=GRID_PARAMS["bounds"],
         resolution=GRID_PARAMS["resolution"],
         projection=GRID_PARAMS["projection"],
         coastline_resolution="10m",
@@ -301,10 +301,10 @@ def flow_update_grid(
         axis=1, errors='ignore'
     )
 
-    # Merge on stratum 
+    # Merge on stratum
     gdf_NASC = gdf_NASC.merge(
         df_stratum[["stratum", "sigma_bs_mean", "weight_mean"]],
-        on="stratum",  # merge on stratum 
+        on="stratum",  # merge on stratum
         how="left"
     )
 
@@ -352,7 +352,7 @@ def flow_update_grid(
 #         emit_event(
 #             event="test.processed",
 #             resource={"prefect.resource.id": "test_trigger"}
-#         )    
+#         )
 
 # @flow(log_prints=True)
 # def flow_to_be_trigger():

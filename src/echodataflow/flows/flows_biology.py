@@ -69,7 +69,7 @@ def get_count_from_length_specimen(
     Get length count from length and specimen dataframes.
     """
     # Round fish length to nearest integer
-    df_specimen["length"] = df_specimen["fork_length"].round(0).astype(int)                
+    df_specimen["length"] = df_specimen["fork_length"].round(0).astype(int)
 
     # Get length count from both dataframes
     specimen_counts = (
@@ -80,7 +80,7 @@ def get_count_from_length_specimen(
         df_length.groupby(["sex", "length", "haul"])
         .agg({"frequency": "sum"}).reset_index()
     )
-    
+
     df_combined = pd.merge(
         specimen_counts.reset_index(),
         length_counts.reset_index(),
@@ -119,7 +119,7 @@ def get_length_weight_regression(df_specimen: pd.DataFrame) -> pd.DataFrame:
     # Combine all and make everything lowercase
     df_regres = pd.concat([df_regres, df_all]).reset_index()
     df_regres["sex"] = df_regres["sex"].str.lower()
-    
+
     return df_regres
 
 
@@ -234,7 +234,7 @@ def flow_ingest_haul(
     if not file_haul_info_all.exists():
         df_haul_info_all = pd.DataFrame()
         hauls_processed = set()
-    else:            
+    else:
         df_haul_info_all = pd.read_csv(file_haul_info_all, index_col=0)
         hauls_processed = set(df_haul_info_all["haul"].unique())
     hauls_to_process = list(hauls_valid.difference(hauls_processed))
@@ -256,7 +256,7 @@ def flow_ingest_haul(
                 df_length_temp = pd.read_excel(f, index_col=0, sheet_name="Codend").reset_index().drop("Sum", axis=1)
                 df_length_temp = df_length_temp.melt(
                     id_vars=["length"],
-                    var_name="sex", 
+                    var_name="sex",
                     value_name="frequency"
                 ).assign(haul=haul_num)
                 df_length_temp["frequency"] = df_length_temp["frequency"].fillna(0).astype(int)

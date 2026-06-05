@@ -257,7 +257,7 @@ def plot_grid_map(
 ) -> None:
     """
     Plot grid map according to the selected biological variable and tile source.
-    """      
+    """
     # Load grid file
     gdf_grids = gpd.read_file(file_grid)
     gdf_grids = clean_cells(gdf_grids)
@@ -270,12 +270,12 @@ def plot_grid_map(
 
     # Get the base tilemap
     tile = getattr(gvts, map_tile)
-    
+
     # Add label column
     gdf_grids.loc[:, f"{var}_label"] = gdf_grids.loc[:, var].apply(
         lambda v: "Unsampled" if pd.isna(v) else f"{v:.2e} {var_units}"
     )
-    
+
     # Update the hover tooltipe
     hover_tool = HoverTool(
         tooltips=[
@@ -286,7 +286,7 @@ def plot_grid_map(
 
     # Begin plotting
     cells = gv.Polygons(
-        gdf_grids, 
+        gdf_grids,
         vdims=[var, f"{var}_label", "area"]
     ).opts(
         width=900,
@@ -399,7 +399,7 @@ def plot_track_map(
 ) -> None:
     """
     Plot track map with NASC bubbles according to the selected biological variable and tile source.
-    """      
+    """
     # Load grid file
     df_NASC = pd.read_csv(file_NASC, index_col=0)
 
