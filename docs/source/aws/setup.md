@@ -111,7 +111,7 @@ provider=AWS
 
 ## Step 7: Create Credential blocks
 
-Once you have stored the credentials in the ini file, call the below command to create a block securedly stored in your prefect account. For more about blocks refer [Blocks] (https://github.com/OSOceanAcoustics/echodataflow/blob/dev/docs/configuration/blocks.md). 
+Once you have stored the credentials in the ini file, call the below command to create a block securedly stored in your prefect account. For more about blocks refer [Blocks] (https://github.com/echostack-org/echodataflow/blob/dev/docs/configuration/blocks.md). 
 
 ```bash
 echodataflow load-credentials

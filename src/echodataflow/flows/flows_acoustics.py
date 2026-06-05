@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import warnings
 from importlib.resources import files
 from pathlib import Path
 import datetime
@@ -351,6 +352,8 @@ async def flow_create_MVBS(
     time_offset_seconds: float = 0.0,
     slice_mins: int = 10,
     num_slices: int = 3,
+    range_bin: str = "1m",
+    ping_time_bin: str = "5s",
     path_main: str = "",
     file_Sv_csv: str = "Sv_files.csv",
     file_MVBS_csv: str = "MVBS_files.csv",
@@ -396,7 +399,9 @@ async def flow_create_MVBS(
 
     # Validate zarr store paths
     if not path_Sv_zarr.exists():
-        raise ValueError("Sv zarr store does not exist, check raw2Sv flow!")
+        # raise ValueError("Sv zarr store does not exist, check raw2Sv flow!")
+        logger.info("Sv zarr store does not exist, check raw2Sv flow! Creating empty folder for now.")
+        path_Sv_zarr.mkdir(parents=True, exist_ok=True)
     if not path_MVBS_zarr.exists():
         path_MVBS_zarr.mkdir(parents=True, exist_ok=True)
     path_Sv_zarr = str(path_Sv_zarr)  # convert back to string to pass into task
@@ -468,6 +473,8 @@ async def flow_create_MVBS(
             )(
                 start_time=start_time[snum],
                 end_time=end_time[snum],
+                range_bin=range_bin,
+                ping_time_bin=ping_time_bin,
                 path_MVBS_zarrr=path_MVBS_zarr,
                 MVBS_filename=MVBS_filename,
                 path_Sv_zarr=path_Sv_zarr,
@@ -504,6 +511,8 @@ async def flow_create_MVBS(
 def task_create_MVBS(
     start_time: pd.Timestamp,
     end_time: pd.Timestamp,
+    range_bin: str,
+    ping_time_bin: str,
     path_MVBS_zarrr: str,
     MVBS_filename: str,
     path_Sv_zarr: str,
@@ -545,8 +554,8 @@ def task_create_MVBS(
     ds_MVBS = ep.commongrid.compute_MVBS(
         ds_Sv=ds_Sv,
         range_var="depth",
-        range_bin='1m',
-        ping_time_bin='5s',
+        range_bin=range_bin,
+        ping_time_bin=ping_time_bin,
         reindex=False,
         fill_value=np.nan,
     )

@@ -47,6 +47,8 @@ def flow_file_upload(
     with open(exclude_path, "w") as f:
         # Add .DS_Store to exclude list
         f.write(".DS_Store\n")
+        # Exclude all upload_exclude_folders_*.txt files (i.e. this file and any leftover ones)
+        f.write("upload_exclude_folders_*.txt\n")
         # Add other subdirectories
         for subdir in exclude_subdirs:
             f.write(f"/{subdir}/**\n")
