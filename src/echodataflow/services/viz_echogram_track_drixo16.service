@@ -6,7 +6,8 @@ After=network.target
 Type=simple
 WorkingDirectory=/home/exouser/code_git/echodataflow/src/echodataflow/services
 Environment=PATH=/home/exouser/miniforge3/condabin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/home/exouser/miniforge3/bin/mamba run -n echodataflow_20260604 python viz_echogram_track_drixo16.py
+EnvironmentFile=-/home/exouser/.config/echodataflow/services.env
+ExecStart=${MAMBA_BIN} run -n ${ECHODATAFLOW_ENV} python viz_echogram_track_drixo16.py
 Restart=always
 RestartSec=30
 StartLimitInterval=300

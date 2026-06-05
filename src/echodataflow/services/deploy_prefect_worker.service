@@ -6,7 +6,8 @@ After=network.target
 Type=simple
 WorkingDirectory=/home/exouser
 Environment=PATH=/home/exouser/miniforge3/condabin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/bin/bash /home/exouser/code_git/echodataflow/src/echodataflow/services/deploy_prefect_worker.sh
+EnvironmentFile=-/home/exouser/.config/echodataflow/services.env
+ExecStart=${MAMBA_BIN} run -n ${ECHODATAFLOW_ENV} prefect worker start --pool ${PREFECT_POOL}
 Restart=always
 RestartSec=30
 StartLimitInterval=300
