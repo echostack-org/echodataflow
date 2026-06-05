@@ -61,23 +61,16 @@ notebook = [
 test = [
     "pytest",
     "pytest-cov",
-    "pytest-flake8",
     "pytest-xdist",
     "pytest-mock",
 ]
 lint = [
-    "black",
     "check-manifest",
-    "flake8",
-    "flake8-builtins",
-    "flake8-comprehensions",
-    "flake8-mutable",
-    "flake8-print",
-    "isort",
     "mypy",
     "numpydoc",
     "pre-commit",
     "pylint",
+    "ruff",
 ]
 docs = [
     "jupyter-book",
@@ -106,8 +99,12 @@ fallback_version = "unknown"
 local_scheme = "no-local-version"
 version_file = "src/echodataflow/version.py"
 
-[tool.black]
+[tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "A", "C4", "I", "T20"]
+ignore = ["E203", "E722", "W503", "T201"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
