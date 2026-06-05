@@ -41,12 +41,12 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
 ## Running the edge pipeline
 
 1. Start the local Prefect server:
-   ```bash
+   ```shell
    prefect server start
    ```
 
 2. In a new terminal, create and run a work pool:
-   ```bash
+   ```shell
    prefect worker start --pool "local"
    ```
 
@@ -57,8 +57,12 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
    ```
 
 4. Deploy and run the ship pipeline:
-   ```bash
-   python -m echodataflow.deployment.deploy_cli run --default-work-pool-name local --param-config REPO_DIRECTORY/recipes/params/config_ship_2025.yaml --deploy-spec REPO_DIRECTORY/recipes/deploy/deploy_ship_2025.yaml --source-mode local
+   ```shell
+   python -m echodataflow.deployment.deploy_cli run \
+   --source-mode local \
+   --default-work-pool-name local \
+   --param-config REPO_DIRECTORY/recipes/params/config_{MISSION_NAME}.yaml \
+   --deploy-spec REPO_DIRECTORY/recipes/deploy/deploy_{MISSION_NAME}.yaml
    ```
 
 
