@@ -1,19 +1,19 @@
 [Unit]
-Description=Deploy Prefect worker in work-pool local
+Description=Visualization of echogram and ship track
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/exouser
+WorkingDirectory=/home/exouser/code_git/echodataflow/src/echodataflow/services
 Environment=PATH=/home/exouser/miniforge3/condabin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/bin/bash /home/exouser/code_git/echodataflow/src/echodataflow/services/deploy_prefect_worker.sh
+ExecStart=/home/exouser/miniforge3/bin/mamba run -n echodataflow_20260604 python viz_echogram_track_drixo16.py
 Restart=always
 RestartSec=30
 StartLimitInterval=300
 StartLimitBurst=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=drixo16_202606_prefect_worker
+SyslogIdentifier=drixo16_202606_echogram
 
 [Install]
 WantedBy=multi-user.target

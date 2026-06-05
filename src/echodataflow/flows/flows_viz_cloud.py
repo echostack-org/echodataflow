@@ -96,6 +96,7 @@ def flow_update_cache_MVBS(
             compat='override',
             chunks={"channel": -1, "ping_time": -1, "depth": -1},  # load everything into 1 chunk
             engine="zarr",  # use zarr engine for reading
+            consolidated=False,
         )
         # TODO: echo_range:depth swap can be removed once Echoshader is fixed
         ds_MVBS["echo_range"] = ds_MVBS["depth"]
