@@ -125,10 +125,18 @@ to `.service` `ExecStart` usage, with no wrapper shell script required.
 
 5. Check status and logs:
    ```shell
+   # make sure "state = running" and "runs" not increasing
    launchctl print gui/$(id -u)/org.echodataflow.prefect-server
    launchctl print gui/$(id -u)/org.echodataflow.prefect-worker
-   tail -f ~/.local/var/log/echodataflow/prefect-server.err.log  # check server error logs
-   tail -f ~/.local/var/log/echodataflow/prefect-worker.err.log  # check worker error logs
+   # -f to follow logs in real time
+   tail -n 100 ~/.local/var/log/echodataflow/prefect-server.err.log
+   tail -n 100 ~/.local/var/log/echodataflow/prefect-worker.err.log
+   ```
+
+6. To stop and unload services:
+   ```shell
+   launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-server.plist
+   launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-worker.plist
    ```
 
 
