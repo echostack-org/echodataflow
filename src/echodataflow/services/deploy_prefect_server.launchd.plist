@@ -14,9 +14,6 @@
   <key>ThrottleInterval</key>
   <integer>30</integer>
 
-  <key>WorkingDirectory</key>
-  <string>/Users/feresa/code_git/echodataflow</string>
-
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
@@ -28,14 +25,23 @@
     <string>/bin/zsh</string>
     <string>-lc</string>
     <string>
-ENV_FILE=/Users/feresa/.config/echodataflow/services.env
+ENV_FILE="${ECHODATAFLOW_SERVICES_ENV_FILE:-$HOME/.config/echodataflow/services.env}"
 [[ -f "$ENV_FILE" ]] || { echo "Missing $ENV_FILE"; exit 1; }
 
 set -a
 source "$ENV_FILE"
 set +a
 
-DB_PATH="${PREFECT_DB_PATH:-$HOME/.prefect/prefect.db}"
+: "${ECHODATAFLOW_HOME:?ECHODATAFLOW_HOME is not set in services.env}"
+: "${ECHODATAFLOW_WORKDIR:?ECHODATAFLOW_WORKDIR is not set in services.env}"
+: "${ECHODATAFLOW_LOG_DIR:?ECHODATAFLOW_LOG_DIR is not set in services.env}"
+
+mkdir -p "$ECHODATAFLOW_LOG_DIR"
+cd "$ECHODATAFLOW_WORKDIR" || { echo "Missing WORKDIR: $ECHODATAFLOW_WORKDIR"; exit 1; }
+
+exec >>"$ECHODATAFLOW_LOG_DIR/prefect-server.out.log" 2>>"$ECHODATAFLOW_LOG_DIR/prefect-server.err.log"
+
+DB_PATH="${PREFECT_DB_PATH:-$ECHODATAFLOW_HOME/.prefect/prefect.db}"
 AUTO_RESET="${PREFECT_DB_AUTORESET_ON_FAILURE:-false}"
 
 if [[ -f "$DB_PATH" ]]; then
@@ -44,7 +50,7 @@ if [[ -f "$DB_PATH" ]]; then
     echo "Prefect DB health check failed for $DB_PATH: ${DB_CHECK:-no output}"
     if [[ "$AUTO_RESET" == "true" ]]; then
       ts="$(date +%Y%m%d_%H%M%S)"
-      backup_dir="$HOME/.prefect/db-backups/$ts"
+      backup_dir="$ECHODATAFLOW_HOME/.prefect/db-backups/$ts"
       mkdir -p "$backup_dir"
       mv "${DB_PATH}"* "$backup_dir"/ 2>/dev/null || true
       echo "Archived DB files to $backup_dir"
@@ -58,11 +64,5 @@ fi
 exec "$MAMBA_BIN" run -n "$ECHODATAFLOW_ENV" prefect server start --host 127.0.0.1 --port 4200
     </string>
   </array>
-
-  <key>StandardOutPath</key>
-  <string>/Users/feresa/.local/var/log/echodataflow/prefect-server.out.log</string>
-
-  <key>StandardErrorPath</key>
-  <string>/Users/feresa/.local/var/log/echodataflow/prefect-server.err.log</string>
 </dict>
 </plist>

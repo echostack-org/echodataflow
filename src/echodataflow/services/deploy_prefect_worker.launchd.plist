@@ -14,9 +14,6 @@
   <key>ThrottleInterval</key>
   <integer>30</integer>
 
-  <key>WorkingDirectory</key>
-  <string>/Users/feresa/code_git/echodataflow</string>
-
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
@@ -28,21 +25,24 @@
     <string>/bin/zsh</string>
     <string>-lc</string>
     <string>
-ENV_FILE=/Users/feresa/.config/echodataflow/services.env
+ENV_FILE="${ECHODATAFLOW_SERVICES_ENV_FILE:-$HOME/.config/echodataflow/services.env}"
 [[ -f "$ENV_FILE" ]] || { echo "Missing $ENV_FILE"; exit 1; }
 
 set -a
 source "$ENV_FILE"
 set +a
 
+: "${ECHODATAFLOW_HOME:?ECHODATAFLOW_HOME is not set in services.env}"
+: "${ECHODATAFLOW_WORKDIR:?ECHODATAFLOW_WORKDIR is not set in services.env}"
+: "${ECHODATAFLOW_LOG_DIR:?ECHODATAFLOW_LOG_DIR is not set in services.env}"
+
+mkdir -p "$ECHODATAFLOW_LOG_DIR"
+cd "$ECHODATAFLOW_WORKDIR" || { echo "Missing WORKDIR: $ECHODATAFLOW_WORKDIR"; exit 1; }
+
+exec >>"$ECHODATAFLOW_LOG_DIR/prefect-worker.out.log" 2>>"$ECHODATAFLOW_LOG_DIR/prefect-worker.err.log"
+
 exec "$MAMBA_BIN" run -n "$ECHODATAFLOW_ENV" prefect worker start --pool "$PREFECT_POOL"
     </string>
   </array>
-
-  <key>StandardOutPath</key>
-  <string>/Users/feresa/.local/var/log/echodataflow/prefect-worker.out.log</string>
-
-  <key>StandardErrorPath</key>
-  <string>/Users/feresa/.local/var/log/echodataflow/prefect-worker.err.log</string>
 </dict>
 </plist>
