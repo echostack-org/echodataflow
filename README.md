@@ -33,7 +33,7 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
    clone the repo and install it like below:
    ```bash
    git clone git+https://github.com/echostack-org/echodataflow.git  # clone the repo
-   pip install -e .[test,lint,docs]  # install in editable mode with dev tools
+   pip install -e ".[test,lint,docs]"  # install in editable mode with dev tools
    ```
    
 
@@ -112,14 +112,13 @@ to `.service` `ExecStart` usage, with no wrapper shell script required.
    ```
 
 2. Edit `~/.config/echodataflow/services.env` as needed:
-   - Adjust `MAMBA_BIN`
    - Adjust `ECHODATAFLOW_ENV`
+   - Adjust `ECHODATAFLOW_HOME`
+   - Adjust `MAMBA_BIN`
    - Adjust `PREFECT_POOL`
    - Adjust `PREFECT_API_URL`
 
-3. If your macOS username is not `feresa`, update the `ENV_FILE`, `WorkingDirectory`, and log paths inside the two copied plist files.
-
-4. Load and start services:
+3. Load and start services:
    ```shell
    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-server.plist
    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-worker.plist
@@ -127,7 +126,7 @@ to `.service` `ExecStart` usage, with no wrapper shell script required.
    launchctl kickstart -k gui/$(id -u)/org.echodataflow.prefect-worker
    ```
 
-5. Check status and logs:
+4. Check status and logs:
    ```shell
    # make sure "state = running" and "runs" not increasing
    launchctl print gui/$(id -u)/org.echodataflow.prefect-server
@@ -137,19 +136,19 @@ to `.service` `ExecStart` usage, with no wrapper shell script required.
    tail -n 100 ~/.local/var/log/echodataflow/prefect-worker.err.log
    ```
 
-6. To stop and unload services:
+5. To stop and unload services:
    ```shell
    launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-server.plist
    launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-worker.plist
    ```
 
-7. SQLite health checks (local Prefect server):
+6. SQLite health checks (local Prefect server):
    ```shell
    sqlite3 ~/.prefect/prefect.db "PRAGMA quick_check;"
    sqlite3 ~/.prefect/prefect.db "PRAGMA integrity_check;"
    ```
 
-8. If server startup keeps failing with SQLite lock errors, reset local DB safely:
+7. If server startup keeps failing with SQLite lock errors, reset local DB safely:
    ```shell
    # stop services first
    launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/org.echodataflow.prefect-worker.plist
