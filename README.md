@@ -171,7 +171,59 @@ Notes:
 - `database is locked` usually means SQLite write contention, not corruption.
 - For heavier multi-flow usage, move Prefect server DB to Postgres.
 
+## Running Local Prefect Services on Windows (Task Scheduler)
 
+To run a local Prefect server and worker as background services on Windows, you can
+use PowerShell with Windows Task Scheduler and the provided script templates:
+
+- `src/echodataflow/services/deploy_prefect_server.windows.ps1`
+- `src/echodataflow/services/deploy_prefect_worker.windows.ps1`
+
+1. Copy and customize the service environment file:
+   ```powershell
+   New-Item -ItemType Directory -Force "$HOME\.config\echodataflow"
+   New-Item -ItemType Directory -Force "$HOME\.local\var\log\echodataflow"
+
+   Copy-Item src\echodataflow\services\services.env.example_local `
+     "$HOME\.config\echodataflow\services.env"
+   ```
+
+2. Edit `$HOME\.config\echodataflow\services.env` as needed:
+   - Adjust `ECHODATAFLOW_ENV`
+   - Adjust `ECHODATAFLOW_HOME`
+   - Adjust `ECHODATAFLOW_WORKDIR`
+   - Adjust `ECHODATAFLOW_LOG_DIR`
+   - Adjust `MAMBA_BIN`
+   - Adjust `PREFECT_POOL`
+   - Adjust `PREFECT_API_URL`
+
+3. Register the scheduled tasks:
+   ```powershell
+   schtasks /Create /TN "echodataflow-prefect-server" /SC ONLOGON /TR "powershell.exe -ExecutionPolicy Bypass -File C:\path\to\echodataflow\src\echodataflow\services\deploy_prefect_server.windows.ps1"
+
+   schtasks /Create /TN "echodataflow-prefect-worker" /SC ONLOGON /TR "powershell.exe -ExecutionPolicy Bypass -File C:\path\to\echodataflow\src\echodataflow\services\deploy_prefect_worker.windows.ps1"
+   ```
+
+4. Start the tasks:
+   ```powershell
+   schtasks /Run /TN "echodataflow-prefect-server"
+   schtasks /Run /TN "echodataflow-prefect-worker"
+   ```
+
+5. Check task status:
+   ```powershell
+   schtasks /Query /TN "echodataflow-prefect-server"
+   schtasks /Query /TN "echodataflow-prefect-worker"
+   ```
+
+6. Stop and delete the tasks:
+   ```powershell
+   schtasks /End /TN "echodataflow-prefect-worker"
+   schtasks /End /TN "echodataflow-prefect-server"
+
+   schtasks /Delete /TN "echodataflow-prefect-worker"
+   schtasks /Delete /TN "echodataflow-prefect-server"
+   ```
 
 ## License
 
