@@ -50,7 +50,7 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
    prefect worker start --pool "local"
    ```
 
-3. Download the recipes from the [echodataflow-recipes repository](https://github.com/echostack-org/echodataflow-recipes) by clonining it to your computer:
+3. In a new terminal, download the recipes from the [echodataflow-recipes repository](https://github.com/echostack-org/echodataflow-recipes) by clonining it to your computer:
    ```
    cd REPO_DIRECTORY  # switch to where you want the recipes repo to sit
    git clone https://github.com/echostack-org/echodataflow-recipes.git
@@ -106,7 +106,7 @@ to `.service` `ExecStart` usage, with no wrapper shell script required.
 1. Copy and customize the templates for your user:
    ```shell
    mkdir -p ~/.config/echodataflow ~/Library/LaunchAgents ~/.local/var/log/echodataflow
-   cp src/echodataflow/services/services.env.example ~/.config/echodataflow/services.env
+   cp src/echodataflow/services/services.env.example_local ~/.config/echodataflow/services.env
    cp src/echodataflow/services/deploy_prefect_server.launchd.plist ~/Library/LaunchAgents/org.echodataflow.prefect-server.plist
    cp src/echodataflow/services/deploy_prefect_worker.launchd.plist ~/Library/LaunchAgents/org.echodataflow.prefect-worker.plist
    ```
