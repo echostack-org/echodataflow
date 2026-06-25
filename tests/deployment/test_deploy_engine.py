@@ -1,6 +1,7 @@
 import importlib
 import types
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -81,6 +82,62 @@ def test_filter_flows_for_deploy_raises_when_key_and_alias_missing(install_prefe
 
     with pytest.raises(KeyError, match="file_upload_acoustics"):
         engine.filter_flows_for_deploy(all_flows, deploy_cfg)
+
+
+def test_discover_all_flows_does_not_import_unfiltered_modules(
+    monkeypatch,
+    tmp_path,
+    install_prefect_stubs,
+):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+
+    flows_dir = tmp_path / "echodataflow" / "flows"
+    flows_dir.mkdir(parents=True)
+    init_path = flows_dir / "__init__.py"
+    init_path.write_text("", encoding="utf-8")
+    (flows_dir / "good_module.py").write_text(
+        "def flow_good():\n    return 'ok'\n",
+        encoding="utf-8",
+    )
+    (flows_dir / "broken_module.py").write_text(
+        "raise RuntimeError('should not import during discovery')\n\n"
+        "def flow_broken():\n    return 'broken'\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        engine.importlib.util,
+        "find_spec",
+        lambda name: SimpleNamespace(origin=str(init_path)) if name == "echodataflow.flows" else None,
+    )
+
+    imported = []
+
+    def fake_import_module(name):
+        imported.append(name)
+        if name == "echodataflow.flows.good_module":
+            return types.SimpleNamespace(flow_good=object())
+        if name == "echodataflow.flows.broken_module":
+            raise AssertionError("broken module should not be imported")
+        raise ModuleNotFoundError(name)
+
+    monkeypatch.setattr(engine.importlib, "import_module", fake_import_module)
+
+    all_flows = engine.discover_all_flows()
+
+    assert set(all_flows) == {"good", "broken"}
+    assert imported == []
+
+    filtered = engine.filter_flows_for_deploy(
+        all_flows,
+        {"flows": {"good": {"module": "good_module"}}},
+    )
+    engine.import_selected_flows(filtered)
+
+    assert imported == ["echodataflow.flows.good_module"]
+    assert "flow_obj" in filtered["good"]
+    assert "flow_module" in filtered["good"]
 
 
 def test_local_deploy_specs_generate_current_flow_entrypoints(install_prefect_stubs):

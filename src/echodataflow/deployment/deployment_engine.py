@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import ast
 import datetime
+import importlib
+import importlib.util
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
 from typing import Any, cast
-import importlib.util
 
 from prefect.deployments.runner import RunnerDeployment
 from prefect.events import DeploymentEventTrigger
@@ -33,46 +35,73 @@ class DeploymentSpec:
 
 def discover_all_flows() -> dict[str, dict[str, Any]]:
     """
-    Discover all flow_* functions from all modules in echodataflow.flows folder.
-    Returns mapping: flow_name -> {"flow_obj", "module_name", "entrypoint"}
+    Discover all flow_* function names from all modules in echodataflow.flows.
+    This avoids importing every flow module before the deploy config has filtered
+    out unrelated flows.
+
+    Returns mapping: flow_name -> {"module_name", "flow_attr", "entrypoint"}
     """
-    import os
-    
     flows_pkg_spec = importlib.util.find_spec("echodataflow.flows") # this points to __init__.py
     if flows_pkg_spec is None or flows_pkg_spec.origin is None:
         raise ValueError("Could not locate echodataflow.flows package")
-    
+
     flows_dir = Path(flows_pkg_spec.origin).parent  # this points to src/echodataflow/flows
     discovered: dict[str, dict[str, Any]] = {}
-    
+
     # Find all .py files in flows directory (excluding __init__.py)
     for py_file in flows_dir.glob("*.py"):
         if py_file.name.startswith("_"):
             continue
-        
+
         module_name = py_file.stem  # filename without .py
-        try:
-            flow_module = importlib.import_module(f"echodataflow.flows.{module_name}")
-        except ImportError as e:
-            raise ImportError(f"Failed to import echodataflow.flows.{module_name}: {e}")
-        
-        # Find all flow_* attributes in the module
-        for attr_name in dir(flow_module):
+        module_ast = ast.parse(py_file.read_text(), filename=str(py_file))
+
+        for node in module_ast.body:
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+
+            attr_name = node.name
             if not attr_name.startswith("flow_"):
                 continue
-            
+
             flow_name = attr_name.removeprefix("flow_")
-            flow_obj = cast(Flow[..., Any], getattr(flow_module, attr_name))
             entrypoint = f"{DEFAULT_ENTRYPOINT_ROOT}/{module_name}.py:{attr_name}"
-            
+
             discovered[flow_name] = {
-                "flow_obj": flow_obj,
                 "module_name": module_name,
-                "flow_module": flow_module,
+                "flow_attr": attr_name,
                 "entrypoint": entrypoint,
             }
-    
+
     return discovered
+
+
+def import_selected_flows(filtered_flows: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Import only the modules needed by the already-filtered flow set."""
+    imported_modules: dict[str, ModuleType] = {}
+
+    for flow_info in filtered_flows.values():
+        if "flow_obj" in flow_info and "flow_module" in flow_info:
+            continue
+
+        module_name = cast(str, flow_info["module_name"])
+        attr_name = cast(str, flow_info["flow_attr"])
+
+        if module_name not in imported_modules:
+            try:
+                imported_modules[module_name] = importlib.import_module(
+                    f"echodataflow.flows.{module_name}"
+                )
+            except ImportError as e:
+                raise ImportError(
+                    f"Failed to import echodataflow.flows.{module_name}: {e}"
+                ) from e
+
+        flow_module = imported_modules[module_name]
+        flow_info["flow_module"] = flow_module
+        flow_info["flow_obj"] = cast(Flow[..., Any], getattr(flow_module, attr_name))
+
+    return filtered_flows
 
 
 def filter_flows_for_deploy(all_flows: dict[str, dict[str, Any]], deploy_cfg: dict[str, Any]) -> dict[str, dict[str, Any]]:

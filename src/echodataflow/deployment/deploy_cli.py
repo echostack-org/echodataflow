@@ -19,6 +19,7 @@ from echodataflow.deployment.deployment_engine import (
     filter_flows_for_deploy,
     build_deploy_specs,
     create_deployments,
+    import_selected_flows,
     load_config,
     resolve_deployment_source,
     set_prefect_variables,
@@ -68,6 +69,7 @@ def _run_from_specs(
     # Discover all flows and filter to those in deploy config
     all_flows = discover_all_flows()
     filtered_flows = filter_flows_for_deploy(all_flows, deploy_cfg)
+    import_selected_flows(filtered_flows)
     if run_concurrency_setup:
         _run_concurrency_setup(filtered_flows)
 
