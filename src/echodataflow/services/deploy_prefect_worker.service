@@ -7,14 +7,14 @@ Type=simple
 WorkingDirectory=/home/exouser
 Environment=PATH=/home/exouser/miniforge3/condabin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-/home/exouser/.config/echodataflow/services.env
-ExecStart=${MAMBA_BIN} run -n ${ECHODATAFLOW_ENV} prefect worker start --pool ${PREFECT_POOL}
+ExecStart=/usr/bin/env bash -lc '"${MAMBA_BIN}" run -n "${ECHODATAFLOW_ENV}" prefect worker start --pool "${PREFECT_POOL}"'
 Restart=always
 RestartSec=30
 StartLimitInterval=300
 StartLimitBurst=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=drixo16_202606_prefect_worker
+SyslogIdentifier=echodataflow_prefect_worker
 
 [Install]
 WantedBy=multi-user.target
