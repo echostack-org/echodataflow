@@ -1,0 +1,20 @@
+[Unit]
+Description=Visualization of echogram and ship track
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/exouser/code_git/echodataflow/src/echodataflow/services
+Environment=PATH=/home/exouser/miniforge3/condabin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/home/exouser/.config/echodataflow/services.env
+ExecStart=/usr/bin/env bash -lc '"${MAMBA_BIN}" run -n "${ECHODATAFLOW_ENV}" python viz_echogram_track_lasker.py'
+Restart=always
+RestartSec=30
+StartLimitInterval=300
+StartLimitBurst=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=IWCPS_202606_echogram
+
+[Install]
+WantedBy=multi-user.target
