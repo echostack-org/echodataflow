@@ -171,7 +171,86 @@ Notes:
 - `database is locked` usually means SQLite write contention, not corruption.
 - For heavier multi-flow usage, move Prefect server DB to Postgres.
 
+## Running Local Prefect Services on Windows (Task Scheduler)
 
+To run a local Prefect server and worker as background services on Windows, you can
+use PowerShell with Windows Task Scheduler and the provided templates:
+
+- `src/echodataflow/services/deploy_prefect_server.windows.task.xml`
+- `src/echodataflow/services/deploy_prefect_worker.windows.task.xml`
+
+1. Copy and customize the service environment file:
+   ```powershell
+   New-Item -ItemType Directory -Force "$HOME\.config\echodataflow"
+   New-Item -ItemType Directory -Force "$HOME\.local\var\log\echodataflow"
+
+   Copy-Item src\echodataflow\services\services.env.example_local `
+     "$HOME\.config\echodataflow\services.env"
+   ```
+
+2. Edit `$HOME\.config\echodataflow\services.env` as needed:
+   - Adjust `ECHODATAFLOW_ENV`
+   - Adjust `ECHODATAFLOW_HOME`
+   - Adjust `ECHODATAFLOW_WORKDIR`
+   - Adjust `ECHODATAFLOW_LOG_DIR`
+   - Adjust `MAMBA_BIN`
+   - Adjust `PREFECT_POOL`
+   - Adjust `PREFECT_API_URL`
+
+3. Copy and customize the Task Scheduler XML templates:
+   ```powershell
+   Copy-Item src\echodataflow\services\deploy_prefect_server.windows.task.xml `
+     "$HOME\.config\echodataflow\prefect-server.task.xml"
+
+   Copy-Item src\echodataflow\services\deploy_prefect_worker.windows.task.xml `
+     "$HOME\.config\echodataflow\prefect-worker.task.xml"
+   ```
+
+4. Both XML templates are self-contained and read their runtime configuration
+   from `$HOME\.config\echodataflow\services.env`, so they do not need separate
+   `deploy_prefect_*.windows.ps1` files or hard-coded repository script paths.
+
+5. Register the scheduled tasks:
+   ```powershell
+   schtasks /Create /TN "echodataflow-prefect-server" `
+     /XML "$HOME\.config\echodataflow\prefect-server.task.xml" /F
+
+   schtasks /Create /TN "echodataflow-prefect-worker" `
+     /XML "$HOME\.config\echodataflow\prefect-worker.task.xml" /F
+   ```
+
+6. Start the tasks:
+   ```powershell
+   schtasks /Run /TN "echodataflow-prefect-server"
+   Start-Sleep -Seconds 10
+   schtasks /Run /TN "echodataflow-prefect-worker"
+   ```
+
+7. Check task status:
+   ```powershell
+   schtasks /Query /TN "echodataflow-prefect-server" /V /FO LIST
+   schtasks /Query /TN "echodataflow-prefect-worker" /V /FO LIST
+   ```
+
+8. Verify the local Prefect server:
+
+   Open:
+
+   ```text
+   http://127.0.0.1:4200
+   ```
+
+   The Prefect dashboard should load, and the worker should appear online under
+   **Work Pools**.
+
+9. To stop and delete the tasks:
+   ```powershell
+   schtasks /End /TN "echodataflow-prefect-worker"
+   schtasks /End /TN "echodataflow-prefect-server"
+
+   schtasks /Delete /TN "echodataflow-prefect-worker" /F
+   schtasks /Delete /TN "echodataflow-prefect-server" /F
+   ```
 
 ## License
 

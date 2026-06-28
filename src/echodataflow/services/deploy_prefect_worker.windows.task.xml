@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <!-- Task metadata -->
+  <RegistrationInfo>
+    <Description>Run the local Echodataflow Prefect worker at user logon.</Description>
+  </RegistrationInfo>
+
+  <!-- Start at user logon, after a short delay so the server can start first -->
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+      <Delay>PT1M</Delay>
+    </LogonTrigger>
+  </Triggers>
+
+  <!-- Run in the interactive user session -->
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>LeastPrivilege</RunLevel>
+    </Principal>
+  </Principals>
+
+  <!-- Keep worker resilient and always available -->
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+    <RestartOnFailure>
+      <Interval>PT1M</Interval>
+      <Count>999</Count>
+    </RestartOnFailure>
+  </Settings>
+
+  <!-- Launch the PowerShell bootstrap logic directly -->
+  <Actions Context="Author">
+    <Exec>
+      <Command>powershell.exe</Command>
+
+      <!-- Inline startup script; runtime paths come from services.env -->
+      <Arguments><![CDATA[
+        -NoLogo
+        -NoProfile
+        -NonInteractive
+        -ExecutionPolicy Bypass
+        -Command "& {
+          $EnvFile = Join-Path $HOME '.config\echodataflow\services.env'
+
+          # Load service configuration from the standard user config location.
+          if (-not (Test-Path $EnvFile)) {
+              Write-Error ('Missing services env file: ' + $EnvFile)
+              exit 1
+          }
+
+          Get-Content $EnvFile | ForEach-Object {
+              if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
+                  $Name = $matches[1].Trim()
+                  $Value = $matches[2].Trim()
+                  Set-Item -Path ('Env:' + $Name) -Value $Value
+              }
+          }
+
+          $RequiredVars = @(
+              'ECHODATAFLOW_ENV'
+              'ECHODATAFLOW_WORKDIR'
+              'ECHODATAFLOW_LOG_DIR'
+              'MAMBA_BIN'
+              'PREFECT_POOL'
+          )
+
+          foreach ($Var in $RequiredVars) {
+              if (-not (Get-Item -Path ('Env:' + $Var) -ErrorAction SilentlyContinue)) {
+                  Write-Error ('Missing required environment variable: ' + $Var)
+                  exit 1
+              }
+          }
+
+          New-Item -ItemType Directory -Force -Path $env:ECHODATAFLOW_LOG_DIR | Out-Null
+          Set-Location $env:ECHODATAFLOW_WORKDIR
+
+          & $env:MAMBA_BIN run -n $env:ECHODATAFLOW_ENV `
+              prefect worker start `
+              --pool $env:PREFECT_POOL
+        }"
+      ]]></Arguments>
+    </Exec>
+  </Actions>
+</Task>
