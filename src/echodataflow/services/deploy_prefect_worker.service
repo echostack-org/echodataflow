@@ -7,7 +7,7 @@ Type=simple
 WorkingDirectory=/home/exouser
 Environment=PATH=/home/exouser/miniforge3/condabin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-/home/exouser/.config/echodataflow/services.env
-ExecStart=/bin/sh -lc 'exec "$MAMBA_BIN" run -n "$ECHODATAFLOW_ENV" prefect worker start --pool "$PREFECT_POOL"'
+ExecStart=/usr/bin/env bash -lc '"${MAMBA_BIN}" run -n "${ECHODATAFLOW_ENV}" prefect worker start --pool "${PREFECT_POOL}"'
 Restart=always
 RestartSec=30
 StartLimitInterval=300
