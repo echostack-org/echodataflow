@@ -28,246 +28,6 @@ from echodataflow.utils.utils import (
     round_up_mins,
 )
 
-# # Turn on verbose logging for echopype
-# ep.utils.log.verbose()
-
-# def dilate_7x7(da):
-#     """
-#     Applies a 7x7 max filter (dilation) safely across Dask chunks.
-#     """
-#     # size=(1, 7, 7) ensures channels do not blur together, 
-#     # but applies a 7x7 window over ping_time and range_sample
-#     dilated_dask_array = dask_image.ndfilters.maximum_filter(
-#         da.data, 
-#         size=(1, 7, 7) 
-#     )
-    
-#     # Re-wrap the filtered dask array back into an xarray DataArray
-#     return xr.DataArray(dilated_dask_array, dims=da.dims, coords=da.coords)
-
-# def apply_2d_convolution(da):
-#     """Applies a 2D convolution to an xarray DataArray using apply_ufunc."""
-#     # Define a custom wrapper function for scipy's convolve2d
-#     def conv_wrapper(image, kern):
-#         # scipy.signal.convolve2d requires a 2D image and 2D kernel
-#         return convolve2d(
-#             image, kern, mode="same", boundary="symm"
-#         )
-#     kernel_data = np.ones((5, 5)) / 25.0
-#     kernel = xr.DataArray(kernel_data, dims=["ky", "kx"])
-#     # Use apply_ufunc to map the operation across spatial dimensions
-#     convolved = xr.apply_ufunc(
-#         conv_wrapper,  # The core function to execute
-#         da,  # The input DataArray
-#         kernel,  # The kernel passed as a secondary argument
-#         input_core_dims=[
-#             ["y", "x"],
-#             ["ky", "kx"],
-#         ],  # The core dimensions involved
-#         output_core_dims=[["y", "x"]],  # The core dimensions of the output
-#         vectorize=True,  # Automatically loops over non-core dimensions (e.g., time)
-#     )
-
-#     return convolved
-
-# @task
-# def create_bottom_line_task(
-#     start_time: pd.Timestamp,
-#     end_time: pd.Timestamp,
-#     path_Sv_zarr: str,
-#     Sv_filenames: list[str],
-#     channel: str =  "WBT 987763-15 ES38-7_ES",
-#     var_name: str = "Sv",
-#     threshold: tuple = (-55, 0, 0),
-#     offset: float = 0.2,
-#     r0: int = 25,
-#     r1: int = 750,
-#     wtheta: int = 7,
-#     wphi: int = 7,
-#     path_Sv_zarr: str = "PATH_TO_STORE_SV_ZARR",
-# ):
-#     """
-#     Convert raw sonar data to Sv and save to zarr format.
-#     """ 
-#     # Convert raw file, consolidate Sv and save to zarr
-#     logger = get_run_logger()
-
-#     # Remove timezone info for slicing
-#     start_time = start_time.replace(tzinfo=None)
-#     end_time = end_time.replace(tzinfo=None)
-
-#     # Combine Sv files into a single dataset
-#     ds_Sv = xr.open_mfdataset(
-#         [Path(path_Sv_zarr) / svf for svf in Sv_filenames],
-#         parallel=True,
-#         coords="minimal",
-#         data_vars="minimal",
-#         compat='override',
-#         chunks={"channel": 1, "ping_time": 1000, "range_sample": -1},
-#         engine="zarr",  # use zarr engine for reading
-#     ).sel(
-#         # slice start/end, end exclusive
-#         ping_time=slice(start_time, end_time-pd.to_timedelta("1nanoseconds"))
-#     )
-
-#     depth = ds_Sv["depth"]
-
-#     return (
-#         out_path.name, 
-#         pd.to_datetime(ds_Sv["ping_time"][0].values),
-#         pd.to_datetime(ds_Sv["ping_time"][-1].values)
-#     )
-
-# @flow(log_prints=True)
-# def flow_ast_cps(
-#     start_time: pd.Timestamp,
-#     end_time: pd.Timestamp,
-#     slice_mins: int = 10,
-#     num_slices: int = 3,
-#     path_main: str = "",
-#     bottom_line_csv: str = "bottom_line.csv",
-#     file_Sv_csv: str = "Sv_files.csv",
-# ):
-#     """
-#     Main flow to execute the AST CPS Sv formatting, alignment, filtering and mask generation.
-#     """
-#     logger = get_run_logger()
-
-#     end_time = round_up_mins(
-#         datetime.datetime.now() - datetime.timedelta(seconds=time_offset_seconds),
-#         slice_mins=slice_mins,
-#     ).astimezone(datetime.timezone.utc)  # convert to UTC
-
-#     logger.info(
-#         "flow started with parameters:\n"
-#         f"- end_time: {end_time}\n"
-#         f"- slice_mins: {slice_mins}\n"
-#         f"- num_slices: {num_slices}\n"
-#     )
-
-#     # Compute slice time range
-#     start_time, end_time = get_slice_start_end_times(
-#         end_time=end_time, slice_mins=slice_mins, num_slices=num_slices
-#     )
-
-#     # Assemble paths
-#     file_Sv_csv = Path(path_main) / file_Sv_csv
-#     file_bottom_line_csv = Path(path_main) / bottom_line_csv
-#     path_Sv_zarr = Path(path_main) / "Sv"
-#     path_bottom_line = Path(path_main) / "bottom_line"
-
-#     # Validate zarr store paths
-#     if not path_Sv_zarr.exists():
-#         # raise ValueError("Sv zarr store does not exist, check raw2Sv flow!")
-#         logger.info("Sv zarr store does not exist, check raw2Sv flow! Creating empty folder for now.")
-#         path_Sv_zarr.mkdir(parents=True, exist_ok=True)
-#     if not path_bottom_line.exists():
-#         path_bottom_line.mkdir(parents=True, exist_ok=True)
-#     path_Sv_zarr = str(path_Sv_zarr)  # convert back to string to pass into task
-#     path_bottom_line = str(path_bottom_line)  # convert back to string to pass into task
-
-#     # Load Sv and MVBS info dataframes
-#     if not file_Sv_csv.exists():
-#         raise ValueError("Sv info csv does not exist, check raw2Sv flow!")
-#     df_Sv = pd.read_csv(
-#         file_Sv_csv,
-#         index_col=0,
-#         date_format="ISO8601",
-#         parse_dates=["first_ping_time", "last_ping_time"]
-#     )
-#     # Convert last_ping_time and first_ping_time to UTC
-#     if not df_Sv.empty:
-#         if df_Sv["last_ping_time"].dt.tz is None:
-#             df_Sv["last_ping_time"] = df_Sv["last_ping_time"].dt.tz_localize("UTC")
-#         if df_Sv["first_ping_time"].dt.tz is None:
-#             df_Sv["first_ping_time"] = df_Sv["first_ping_time"].dt.tz_localize("UTC")
-#     else:
-#         logger.info(
-#             "Sv info csv is empty, raw2Sv flow may have just started! "
-#             "No MVBS can be created, exiting flow."
-#         )
-#         return
-#     #TODO Change to use bottom_line_csv
-#     if not file_bottom_line_csv.exists():
-#         df_bottom_line = pd.DataFrame(
-#             columns=["bottom_line_filename", "first_ping_time", "last_ping_time"]
-#         )
-#         df_bottom_line.to_csv(file_bottom_line_csv)
-#     else:
-#         df_bottom_line = pd.read_csv(
-#             file_bottom_line_csv,
-#             index_col=0,
-#             date_format="ISO8601",
-#             parse_dates=["first_ping_time", "last_ping_time"]
-#         )
-
-#     # Sequentially create MVBS slices
-#     errors = []
-#     for snum in range(num_slices):
-#         logger.info(f"Slice {snum+1}: {start_time[snum]} to {end_time[snum]}")
-
-#         # Get Sv files in the specified time range
-#         Sv_filenames = sorted(
-#         df_Sv[
-#                 (pd.to_datetime(df_Sv["last_ping_time"]) >= start_time[snum]) &
-#                 (pd.to_datetime(df_Sv["first_ping_time"]) <= end_time[snum])
-#             ]["Sv_filename"].tolist()
-#         )
-#         logger.info(
-#             f"Found {len(Sv_filenames)} Sv files in the specified time range: \n"
-#             + "".join([f"- {svf}\n" for svf in Sv_filenames])
-#         )
-
-#         # If no Sv files found, skip this slice
-#         if len(Sv_filenames) == 0:
-#             logger.info(f"No Sv files found for slice {snum+1}, skipping")
-#             continue
-        
-#     #TODO create a task for the bottom line
-#         # Create MVBS for this slice
-#         try:
-#             MVBS_filename = f"MVBS_{start_time[snum].strftime("%Y%m%dT%H%M%S")}.zarr"
-#             first_ping_time, last_ping_time = task_create_MVBS.with_options(
-#                 task_run_name=MVBS_filename,
-#                 name=MVBS_filename,
-#             )(
-#                 start_time=start_time[snum],
-#                 end_time=end_time[snum],
-#                 range_bin=range_bin,
-#                 ping_time_bin=ping_time_bin,
-#                 path_MVBS_zarrr=path_MVBS_zarr,
-#                 MVBS_filename=MVBS_filename,
-#                 path_Sv_zarr=path_Sv_zarr,
-#                 Sv_filenames=Sv_filenames,
-#             )
-
-#             # Add MVBS slice info to dataframe
-#             if MVBS_filename in df_MVBS["MVBS_filename"].values:
-#                 logger.info(f"MVBS file {MVBS_filename} already exists, updating first and last ping times")
-#                 idx_to_add = df_MVBS.index[df_MVBS["MVBS_filename"] == MVBS_filename]
-#             else:
-#                 logger.info(f"Adding new MVBS file {MVBS_filename} to tracking dataframe")
-#                 idx_to_add = len(df_MVBS)
-#             df_MVBS.loc[idx_to_add] = [MVBS_filename, first_ping_time, last_ping_time]
-#         except Exception as e:
-#             errors.append(e)
-#             logger.error(f"Error during MVBS creation for slice {snum+1}: {e}")
-    
-#     #TODO create a task for the mask
-#     # Save updated MVBS info dataframe
-#     df_MVBS.to_csv(file_MVBS_csv, date_format="%Y-%m-%dT%H:%M:%S")
-
-#     # Set flow to Failed state if any errors occurred
-#     if len(errors) > 0:
-#         error_msg = f"{len(errors)} errors during MVBS creation out of {num_slices} slices"
-#         async with get_client() as client:
-#             await client.set_flow_run_state(
-#                 flow_run_id=runtime.flow_run.id,
-#                 state=Failed(message=error_msg)
-#             )
-#         raise Exception(error_msg)
-
-
 @task(name="dilate_7x7")
 def dilate_7x7(da: xr.DataArray) -> xr.DataArray:
     """Applies a 7x7 max filter (dilation) safely across Dask chunks."""
@@ -280,10 +40,10 @@ def dilate_7x7(da: xr.DataArray) -> xr.DataArray:
 
 @task(log_prints=True)
 def task_compute_NASC(
-    NASC_filename: str,
-    ds_Sv_masked: xr.Dataset,
-    path_NASC_zarr: str = "PATH_TO_SAVE_NASC_ZARR",
-):
+        NASC_filename: str,
+        ds_Sv_masked: xr.Dataset,
+        path_NASC_zarr: str = "PATH_TO_SAVE_NASC_ZARR",
+    ):
     logger = get_run_logger()
 
 
@@ -321,6 +81,8 @@ def task_process_acoustic(
     """
     print(f"Loading and processing {raw_path}...")
     
+    zarr_chunks = {"channel": 1, "ping_time": 1000, "range_sample": -1}
+
     ed = ep.open_raw(
         raw_file=str(raw_path),
         sonar_model=sonar_model,
@@ -406,9 +168,16 @@ def task_process_acoustic(
     # Final Boolean target mask
     mask_sd = (sd_200 > -65) & (sd_120 > -65)
 
-    channel_38 = "WBT 987763-15 ES38-7_ES"
-    differencing = ds_Sv["Sv_dilated"] - ds_Sv["Sv_dilated"].sel(channel=channel_38)
+    ds_Sv["Sv_smoothed"] = ds_Sv["Sv_corrected"].rolling(
+    ping_time=3,
+    range_sample=11
+    ).mean() 
 
+    channel_38 = "WBT 987763-15 ES38-7_ES"
+    ds_Sv["Sv_dilated"] = dilate_7x7.fn(ds_Sv["Sv_smoothed"])
+    
+    differencing = ds_Sv["Sv_dilated"] - ds_Sv["Sv_dilated"].sel(channel=channel_38)
+    
     # 2. Extract the specific channels ONCE
     diff_200 = differencing.sel(channel="WBT 987771-15 ES200-7C_ES")
     diff_120 = differencing.sel(channel="WBT 987753-15 ES120-7C_ES")
@@ -425,13 +194,20 @@ def task_process_acoustic(
 
     ds_Sv["Sv"] = ds_Sv['Sv'].where(final_mask)
 
-    ds_Sv = ep.consolidate.add_location(ds_Sv)
+    ds_Sv = ep.consolidate.add_location(ds = ds_Sv, echodata=ed, datagram_type = 'MRU1')
 
+
+    ds_Sv = ds_Sv.chunk(zarr_chunks)
+    
 
     # 6. Save Mask Output to Zarr
-    ds_nasc = task_compute_nasc.fn(ds_Sv, df)
+    ds_nasc = task_compute_NASC.fn(
+        NASC_filename=f"{Path(raw_path).stem}_nasc.zarr",
+        ds_Sv_masked=ds_Sv,
+        path_NASC_zarr=path_output_zarr
+    )
 
-    # 6. Save Mask Output to Zarr
+
     out_zarr = Path(path_output_zarr) / f"{Path(raw_path).stem}_mask.zarr"
     ds_Sv.to_zarr(
         store=out_zarr,
@@ -439,14 +215,6 @@ def task_process_acoustic(
         consolidated=True,
     )
     
-    # 7. Save NASC Output to Zarr
-    out_nasc_zarr = Path(path_output_zarr) / f"{Path(raw_path).stem}_nasc.zarr"
-    ds_nasc.to_zarr(
-        store=out_nasc_zarr,
-        mode="w",
-        consolidated=True,
-    )
-
     return (
         out_zarr.name, 
         pd.to_datetime(ds_Sv["ping_time"][0].values),
@@ -471,7 +239,8 @@ def flow_process_acoustic_data(
     file_Sv_csv: str = "processed_files_registry.csv",
     new_file_num_limit: int = 50,
 ):
-
+    print(f"Starting flow_process_acoustic_data with parameters:\n")
+    errors = []
     # Check if the deployment is already running
     already_running = asyncio.run(deployment_already_running())
     if already_running:
@@ -625,16 +394,25 @@ def flow_process_acoustic_data(
     # Set flow to Failed state if any errors occurred
     if len(errors) > 0:
         error_msg = f"{len(errors)} errors during acoustic processing out of {len(new_files)} files"
-        if flow_run_id:
+        
+        # Safely grab the flow_run_id from the Prefect runtime
+        try:
+            current_run_id = runtime.flow_run.id
+        except AttributeError:
+            current_run_id = None
+
+        if current_run_id:
             async def set_failed_state():
                 async with get_client() as client:
                     await client.set_flow_run_state(
-                        flow_run_id=flow_run_id,
+                        flow_run_id=current_run_id,
                         state=Failed(message=error_msg)
                     )
             asyncio.run(set_failed_state())
+            
         raise Exception(error_msg)
 
 
 if __name__ == "__main__":
-    flow_process_acoustic_data()
+    flow_process_acoustic_data(path_raw=r"C:\Users\elias.capriles\Desktop\Raw", path_main=r"C:\Users\elias.capriles\Desktop\Raw", new_file_num_limit=10)
+#"C:\Users\elias.capriles\Desktop\Raw"
