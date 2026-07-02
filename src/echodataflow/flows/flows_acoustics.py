@@ -122,7 +122,8 @@ def flow_raw2Sv(
     waveform_mode: str = "CW",
     depth_offset: float = 9.5,
     sonar_model: str = "EK80",
-    nmea_sentence: str = "GGA",
+    datagram_type: str|None = None,
+    nmea_sentence: str|None = None,
     filename_pattern: str = "*.raw",
     path_main: str = "",
     path_raw: str = "",
@@ -224,6 +225,7 @@ def flow_raw2Sv(
         waveform_mode=waveform_mode,
         depth_offset=depth_offset,
         sonar_model=sonar_model,
+        datagram_type=datagram_type,
         nmea_sentence=nmea_sentence,
     )
 
@@ -302,7 +304,8 @@ def task_raw2Sv(
     waveform_mode: str = "CW",
     depth_offset: float = 9.5,  # in meters
     sonar_model: str = "EK80",
-    nmea_sentence: str = "GGA",
+    datagram_type: str|None = None,
+    nmea_sentence: str|None = None,
     path_Sv_zarr: str = "PATH_TO_STORE_SV_ZARR",
 ):
     """
@@ -328,6 +331,7 @@ def task_raw2Sv(
     ds_Sv = ep.consolidate.add_location(
         ds=ds_Sv,
         echodata=ed,
+        datagram_type=datagram_type,
         nmea_sentence=nmea_sentence,
     )
     
