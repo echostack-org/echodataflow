@@ -1,6 +1,7 @@
 from pathlib import Path
 import datetime
 import asyncio
+import importlib
 import re
 
 import pandas as pd
@@ -12,6 +13,7 @@ from botocore.config import Config
 from prefect import flow, task, get_client, runtime
 from prefect import runtime
 from prefect.client.schemas.filters import FlowRunFilter
+from prefect.events import emit_event
 from prefect.states import Cancelled
 from prefect.variables import Variable
 
@@ -106,6 +108,29 @@ def _iter_s3_keys(s3_client, s3_bucket: str, prefix: str):
     for page in paginator.paginate(Bucket=s3_bucket, Prefix=prefix):
         for obj in page.get("Contents", []):
             yield obj["Key"]
+
+
+@flow(log_prints=True)
+def flow_deployment_wrapper(
+    flow_module: str,
+    flow_name: str,
+    emit_events: list[str] | None = None,
+    **flow_kwargs,
+):
+    """Run a target flow and apply optional deployment-level behavior."""
+    module = importlib.import_module(f"echodataflow.flows.{flow_module}")
+    flow_fn = getattr(module, flow_name)
+    result = flow_fn(**flow_kwargs)
+
+    if emit_events:
+        resource_name = flow_name.removeprefix("flow_")
+        for event_name in emit_events:
+            emit_event(
+                event=event_name,
+                resource={"prefect.resource.id": resource_name},
+            )
+
+    return result
 
 
 @flow(log_prints=True)

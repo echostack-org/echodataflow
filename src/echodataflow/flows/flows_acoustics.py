@@ -21,7 +21,6 @@ from botocore.config import Config
 
 from prefect import flow, task, get_run_logger, get_client
 from prefect_dask import DaskTaskRunner
-from prefect.exceptions import ObjectAlreadyExists, ObjectNotFound
 from prefect.states import Cancelled, Failed
 from prefect import runtime
 from prefect.variables import Variable
@@ -37,19 +36,6 @@ from segmentation_inference.model import binary_hake_model
 from segmentation_inference.utils import get_MVBS_tensor
 
 import torch
-
-
-
-async def set_concurrency_limit():
-    async with get_client() as client:
-        try:
-            await client.read_concurrency_limit_by_tag("raw2Sv")
-        except ObjectNotFound:
-            try:
-                await client.create_concurrency_limit(tag="raw2Sv", concurrency_limit=4)
-            except ObjectAlreadyExists:
-                pass
-
 
 # Turn on verbose logging for echopype
 # otherwise all logging will be muted

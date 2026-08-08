@@ -15,7 +15,6 @@ from echodataflow.utils.grid import create_boundary_gdf, create_grid_from_bounds
 from echodataflow.flows.flows_biology import add_stratum
 
 from prefect import task, flow, get_run_logger
-from prefect.events import emit_event
 
 
 # Turn on verbose logging for echopype
@@ -257,11 +256,6 @@ def flow_ingest_NASC(
         )
         gdf_NASC.to_file(Path(path_vm_local) / file_NASC_all_grid, driver="GeoJSON")
 
-        # Emit custom event when new NASC files are processed
-        emit_event(
-            event="nasc.ingested",
-            resource={"prefect.resource.id": "ingest_NASC"}
-        )
 
         # TODO: add error handling
 

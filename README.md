@@ -77,11 +77,12 @@ Note: Starting the server and running work pool is unnecessary if local Mac Pref
 4. Deploy and run the edge pipeline:
    ```shell
    echodataflow-deploy run \
-   --source-mode local \
    --default-work-pool-name local \
    --param-config REPO_DIRECTORY/recipes/params/params_{MISSION_NAME}.yaml \
    --deploy-spec REPO_DIRECTORY/recipes/deploy/deploy_{MISSION_NAME}.yaml
    ```
+   The deployment source is selected from the `source` section in the deploy recipe.
+   If not set, it is default to using the local codebase.
 
 
 ## Running the cloud pipeline
@@ -101,11 +102,12 @@ Note: Starting the server and running work pool is unnecessary if local Mac Pref
 5. Deploy and run the cloud pipeline:
    ```bash
    echodataflow-deploy run \
-   --source-mode local \
    --default-work-pool-name local \
    --param-config REPO_DIRECTORY/recipes/params/params_{MISSION_NAME}.yaml \
    --deploy-spec REPO_DIRECTORY/recipes/deploy/deploy_{MISSION_NAME}.yaml
    ```
+   The deployment source is selected from the `source` section in the deploy recipe.
+   If not set, it is default to using the local codebase.
 
 6. Start up system services that hosts the 2 sets of visualization
 

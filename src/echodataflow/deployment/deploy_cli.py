@@ -4,14 +4,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import importlib
-import inspect
-import os
 from pathlib import Path
 from typing import Any
 
 from prefect import deploy
-from yaml import safe_load
+from prefect.variables import Variable
 
 
 from echodataflow.deployment.deployment_engine import (
@@ -21,37 +18,68 @@ from echodataflow.deployment.deployment_engine import (
     create_deployments,
     load_config,
     resolve_deployment_source,
-    set_prefect_variables,
     validate_flow_coverage,
 )
 
 
-def _run_concurrency_setup(filtered_flows: dict[str, dict[str, Any]]) -> None:
-    """Run set_concurrency_limit for modules with flows in filtered_flows."""
-    seen_modules = set()
-    
-    for flow_info in filtered_flows.values():
-        flow_module = flow_info["flow_module"]
-        module_name = id(flow_module)  # use object id to track unique modules
-        if module_name in seen_modules:
-            continue
-        seen_modules.add(module_name)
-        
-        setup_fn = getattr(flow_module, "set_concurrency_limit", None)
-        if not callable(setup_fn):
+def _run_concurrency_setup(deploy_cfg: dict[str, Any]) -> None:
+    """Create Prefect concurrency limits declared on individual flow configs."""
+    concurrency_by_tag: dict[str, int] = {}
+
+    for flow_key, deploy_meta in deploy_cfg.get("flows", {}).items():
+        if not isinstance(deploy_meta, dict):
             continue
 
-        if inspect.iscoroutinefunction(setup_fn):
-            asyncio.run(setup_fn())
-        else:
-            setup_fn()
+        concurrency_limit = deploy_meta.get("concurrency_limit")
+        if concurrency_limit is None:
+            continue
+        if not isinstance(concurrency_limit, int) or concurrency_limit < 1:
+            raise ValueError(
+                f"deploy_cfg.flows.{flow_key}.concurrency_limit must be an integer >= 1"
+            )
+
+        concurrency_tag = deploy_meta.get("concurrency_tag", flow_key)
+        if not isinstance(concurrency_tag, str) or not concurrency_tag.strip():
+            raise ValueError(
+                f"deploy_cfg.flows.{flow_key}.concurrency_tag must be a non-empty string"
+            )
+        concurrency_tag = concurrency_tag.strip()
+
+        existing_limit = concurrency_by_tag.get(concurrency_tag)
+        if existing_limit is not None and existing_limit != concurrency_limit:
+            raise ValueError(
+                f"Conflicting concurrency_limit for tag {concurrency_tag!r}: "
+                f"{existing_limit} != {concurrency_limit}"
+            )
+        concurrency_by_tag[concurrency_tag] = concurrency_limit
+
+    if not concurrency_by_tag:
+        return
+
+    from prefect import get_client
+    from prefect.exceptions import ObjectAlreadyExists, ObjectNotFound
+
+    async def ensure_concurrency_limits() -> None:
+        async with get_client() as client:
+            for concurrency_tag, concurrency_limit in concurrency_by_tag.items():
+                try:
+                    await client.read_concurrency_limit_by_tag(concurrency_tag)
+                except ObjectNotFound:
+                    try:
+                        await client.create_concurrency_limit(
+                            tag=concurrency_tag,
+                            concurrency_limit=concurrency_limit,
+                        )
+                    except ObjectAlreadyExists:
+                        pass
+
+    asyncio.run(ensure_concurrency_limits())
 
 
 def _run_from_specs(
     *,
     param_cfg_path: Path,
     deploy_cfg_path: Path,
-    source_mode: str | None,
     run_concurrency_setup: bool,
     default_work_pool_name: str = "local",
 ) -> None:
@@ -62,19 +90,18 @@ def _run_from_specs(
     # Validate the pair of configs contain the same flows
     validate_flow_coverage(param_cfg, deploy_cfg)
 
-    # Set prefect variables
-    set_prefect_variables(deploy_cfg)
+    # Set "flow_start_time" as a Prefect variable
+    Variable.set("flow_start_time", deploy_cfg.get("flow_start_time"), overwrite=True)
 
     # Discover all flows and filter to those in deploy config
     all_flows = discover_all_flows()
     filtered_flows = filter_flows_for_deploy(all_flows, deploy_cfg)
     if run_concurrency_setup:
-        _run_concurrency_setup(filtered_flows)
+        _run_concurrency_setup(deploy_cfg)
 
     # Set up deployment source: git or local
     source = resolve_deployment_source(
         deploy_cfg=deploy_cfg,
-        source_mode_override=source_mode,
         log_context="deploy_cli",
     )
 
@@ -91,6 +118,7 @@ def _run_from_specs(
         param_cfg=param_cfg,
         deploy_cfg=deploy_cfg,
         source=source,
+        default_work_pool_name=default_work_pool_name,
     )
 
     deploy(*grouped, work_pool_name=default_work_pool_name)
@@ -108,15 +136,6 @@ def _build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser(
         "run",
         help="Run deployments from explicit YAML file paths.",
-    )
-    run_parser.add_argument(
-        "--source-mode",
-        choices=("local", "git"),
-        default=None,
-        help=(
-            "Temporarily override source selection for this run. "
-            "Maps to PREFECT_SOURCE_MODE."
-        ),
     )
     run_parser.add_argument(
         "--default-work-pool-name",
@@ -152,15 +171,10 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
-    source_mode = args.source_mode
-    if source_mode is not None:
-        os.environ["PREFECT_SOURCE_MODE"] = source_mode
-
     if args.target == "run":
         _run_from_specs(
             param_cfg_path=args.param_config,
             deploy_cfg_path=args.deploy_spec,
-            source_mode=source_mode,
             run_concurrency_setup=args.use_concurrency,
             default_work_pool_name=args.default_work_pool_name,
         )
