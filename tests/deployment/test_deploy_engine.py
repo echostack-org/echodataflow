@@ -202,6 +202,7 @@ def test_create_deployments_applies_runner_and_shared_queue(
         entrypoint="echodataflow/flows/flows_acoustics.py:flow_raw2Sv_postprocessing",
         parameters={},
         concurrency_group="postprocessing",
+        concurrency_limit={"limit": 1, "collision_strategy": "CANCEL_NEW"},
         task_runner={"type": "dask", "cluster_kwargs": {"n_workers": 4}},
     )
 
@@ -212,6 +213,9 @@ def test_create_deployments_applies_runner_and_shared_queue(
     )
 
     assert calls["deployment"]["work_queue_name"] == "postprocessing"
+    native_limit = calls["deployment"]["concurrency_limit"]
+    assert native_limit.limit == 1
+    assert native_limit.collision_strategy.value == "CANCEL_NEW"
     runtime_config = calls["deployment"]["job_variables"]["env"]["ECHODATAFLOW_TASK_RUNNER"]
     assert runtime_config == ('{"type": "dask", "cluster_kwargs": {"n_workers": 4}}')
     assert len(grouped) == 1
@@ -278,6 +282,10 @@ def test_validate_deploy_config_accepts_every_allowed_key(install_prefect_stubs)
                 "interval": 10,
                 "cron_offset": 3,
                 "inject_time_offset": True,
+                "concurrency_limit": {
+                    "limit": 1,
+                    "collision_strategy": "CANCEL_NEW",
+                },
                 "work_pool_name": "special-pool",
                 "task_runner": {
                     "type": "dask",
@@ -314,12 +322,18 @@ def test_validate_deploy_config_accepts_every_allowed_key(install_prefect_stubs)
         "flow",
         "interval",
         "cron_offset",
+        "concurrency_limit",
         "triggers",
         "inject_time_offset",
         "task_runner",
         "work_pool_name",
     }
     assert core.ALLOWED_CONCURRENCY_GROUP_KEYS == {"limit"}
+    assert core.ALLOWED_CONCURRENCY_LIMIT_KEYS == {
+        "limit",
+        "collision_strategy",
+        "grace_period_seconds",
+    }
     assert core.ALLOWED_TASK_RUNNER_KEYS == {"type", "cluster_kwargs"}
     assert core.ALLOWED_DASK_CLUSTER_KEYS == {
         "memory_limit",
@@ -643,3 +657,40 @@ def test_build_deploy_specs_rejects_inject_time_offset_for_incompatible_flow(
             deploy_cfg=deploy_cfg,
             resolved_flows=resolved_flows,
         )
+
+
+def test_build_deploy_specs_preserves_native_concurrency_limit(install_prefect_stubs):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+
+    def _flow_fn():
+        return None
+
+    class _FakeFlow:
+        fn = staticmethod(_flow_fn)
+
+    specs = engine.build_deploy_specs(
+        param_cfg={"flows": {"raw2Sv": {}}},
+        deploy_cfg={
+            "flows": {
+                "raw2Sv": {
+                    "concurrency_limit": {
+                        "limit": 1,
+                        "collision_strategy": "CANCEL_NEW",
+                    },
+                }
+            }
+        },
+        resolved_flows={
+            "raw2Sv": {
+                "flow_obj": _FakeFlow(),
+                "entrypoint": "echodataflow/flows/flows_acoustics.py:flow_raw2Sv",
+            }
+        },
+    )
+
+    assert specs[0].parameters == {}
+    assert specs[0].concurrency_limit == {
+        "limit": 1,
+        "collision_strategy": "CANCEL_NEW",
+    }

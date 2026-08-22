@@ -1,8 +1,7 @@
 from pathlib import Path
 import datetime
 
-from prefect import flow, get_client, runtime, task
-from prefect.client.schemas.filters import FlowRunFilter
+from prefect import flow
 
 
 @flow(timeout_seconds=600, log_prints=True)
@@ -72,23 +71,3 @@ def flow_file_upload(
 
     # Remove the exclude list file after upload
     exclude_path.unlink(missing_ok=True)
-
-
-@task(log_prints=True)
-async def deployment_already_running() -> bool:
-    """Return whether another run of the current deployment is running."""
-    # Not running as a deployment, so skip the check
-    if runtime.deployment.id is None:
-        return False
-
-    # Check if the deployment is already running
-    async with get_client() as client:
-        # Get all running flows for this deployment using simpler filters
-        running_flows = await client.read_flow_runs(
-            flow_run_filter=FlowRunFilter(
-                deployment_id={"any_": [runtime.deployment.id]},
-                state={"type": {"any_": ["RUNNING"]}},
-            )
-        )
-
-        return len(running_flows) > 1

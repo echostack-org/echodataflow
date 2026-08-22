@@ -1,8 +1,10 @@
 import json
 
+from prefect.task_runners import ThreadPoolTaskRunner
+
 from echodataflow.deployment.task_runners import (
     TASK_RUNNER_ENV_VAR,
-    dask_task_runner_from_environment,
+    task_runner_from_environment,
 )
 
 
@@ -21,7 +23,7 @@ def test_dask_task_runner_uses_runtime_environment(monkeypatch):
         ),
     )
 
-    runner = dask_task_runner_from_environment()
+    runner = task_runner_from_environment()
 
     assert runner.cluster_kwargs == {
         "n_workers": 4,
@@ -30,9 +32,9 @@ def test_dask_task_runner_uses_runtime_environment(monkeypatch):
     }
 
 
-def test_dask_task_runner_preserves_default_without_runtime_config(monkeypatch):
+def test_task_runner_uses_prefect_default_without_runtime_config(monkeypatch):
     monkeypatch.delenv(TASK_RUNNER_ENV_VAR, raising=False)
 
-    runner = dask_task_runner_from_environment()
+    runner = task_runner_from_environment()
 
-    assert runner.cluster_kwargs == {}
+    assert isinstance(runner, ThreadPoolTaskRunner)

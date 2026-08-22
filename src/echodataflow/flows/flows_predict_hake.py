@@ -20,7 +20,9 @@ from echodataflow.utils.manifests import (
 )
 from echodataflow.operations.operations_postprocessing import (
     build_prediction_ledger,
+    failure_state,
     plan_prediction_slices,
+    propagate_status,
     read_or_create_ledger,
 )
 from echodataflow.operations.operations_predict_hake import (
@@ -251,6 +253,8 @@ def flow_predict_hake_postprocessing(
     path_main: str,
     path_weight: str,
     prediction_slice_mins: int = 40,
+    new_file_num_limit: int = -1,
+    max_flow_run_attempts: int = 3,
     temperature: float = 0.5,
     softmax_threshold: float = 0.5,
     max_depth: float = 590.0,
@@ -260,6 +264,7 @@ def flow_predict_hake_postprocessing(
     file_prediction_csv: str = "prediction_files.csv",
 ) -> None:
     """Predict all newly ready windows, combining aligned MVBS slices."""
+
     logger = get_run_logger()
     file_MVBS_csv = Path(path_main) / file_MVBS_csv
     if not file_MVBS_csv.exists():
@@ -286,11 +291,28 @@ def flow_predict_hake_postprocessing(
             prediction_slice_mins,
         ),
     )
+
+    # Make terminal MVBS failures explicit in downstream planning
+    updated_prediction = propagate_status(
+        df_MVBS,
+        df_prediction,
+        upstream_filename_column="MVBS_filename",
+        upstream_status_column="MVBS_status",
+        downstream_filenames_column="MVBS_filenames",
+        downstream_status_column="prediction_status",
+        upstream_label="MVBS slices",
+    )
+    if not updated_prediction.equals(df_prediction):
+        df_prediction = updated_prediction
+        write_manifest(df_prediction.sort_values("slice_start"), file_prediction_csv)
+
     # Assemble aligned prediction windows from completed MVBS slices
     planned = plan_prediction_slices(
         df_MVBS,
         df_prediction,
     )
+    if new_file_num_limit != -1:
+        planned = planned[:new_file_num_limit]
     if not planned:
         logger.info("No newly ready prediction windows")
         return
@@ -361,7 +383,14 @@ def flow_predict_hake_postprocessing(
         except Exception as exc:
             errors.append(exc)
             idx = df_prediction.index[df_prediction["prediction_filename_postfix"] == postfix][0]
-            df_prediction.loc[idx, ["prediction_status", "error"]] = ["failed", str(exc)]
+            attempt_count, status = failure_state(
+                int(df_prediction.loc[idx, "attempt_count"]), max_flow_run_attempts
+            )
+            df_prediction.loc[idx, ["prediction_status", "attempt_count", "error"]] = [
+                status,
+                attempt_count,
+                str(exc),
+            ]
             write_manifest(df_prediction.sort_values("slice_start"), file_prediction_csv)
             logger.error("Prediction window %s failed: %s", item.start_time, exc)
     if errors:

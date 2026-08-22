@@ -14,12 +14,14 @@ ALLOWED_FLOW_DEPLOY_KEYS = {
     "flow",
     "interval",
     "cron_offset",
+    "concurrency_limit",
     "triggers",
     "inject_time_offset",
     "task_runner",
     "work_pool_name",
 }
 ALLOWED_CONCURRENCY_GROUP_KEYS = {"limit"}
+ALLOWED_CONCURRENCY_LIMIT_KEYS = {"limit", "collision_strategy", "grace_period_seconds"}
 ALLOWED_TASK_RUNNER_KEYS = {"type", "cluster_kwargs"}
 ALLOWED_DASK_CLUSTER_KEYS = {
     "memory_limit",

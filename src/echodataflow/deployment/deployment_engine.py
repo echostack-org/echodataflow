@@ -18,6 +18,7 @@ from yaml import safe_load
 
 from echodataflow.deployment.core import (
     ALLOWED_CONCURRENCY_GROUP_KEYS,
+    ALLOWED_CONCURRENCY_LIMIT_KEYS,
     ALLOWED_DASK_CLUSTER_KEYS,
     ALLOWED_DEPLOY_KEYS,
     ALLOWED_FLOW_DEPLOY_KEYS,
@@ -40,6 +41,7 @@ class DeploymentSpec:
     entrypoint: str  # source-relative entrypoint for the actual deployed flow
     parameters: dict[str, Any]  # parameters passed directly to the deployed flow
     concurrency_group: str | None = None
+    concurrency_limit: dict[str, Any] | None = None
     task_runner: dict[str, Any] | None = None
     cron: str | None = None  # precomputed cron schedule, when interval mode is used
     work_pool_name: str | None = (
@@ -352,6 +354,25 @@ def validate_deploy_config(deploy_cfg: Any) -> None:
         if task_runner is not None:
             validate_task_runner_config(task_runner, path=f"{flow_path}.task_runner")
 
+        concurrency_limit = deploy_meta.get("concurrency_limit")
+        if concurrency_limit is not None:
+            limit_path = f"{flow_path}.concurrency_limit"
+            if not isinstance(concurrency_limit, dict):
+                raise ValueError(f"{limit_path} must be a mapping")
+            _reject_unknown_keys(
+                concurrency_limit,
+                allowed=ALLOWED_CONCURRENCY_LIMIT_KEYS,
+                path=limit_path,
+            )
+            if "limit" not in concurrency_limit:
+                raise ValueError(f"{limit_path}.limit is required")
+            _validate_positive_integer(concurrency_limit["limit"], path=f"{limit_path}.limit")
+            strategy = concurrency_limit.get("collision_strategy", "ENQUEUE")
+            if strategy not in {"ENQUEUE", "CANCEL_NEW"}:
+                raise ValueError(
+                    f"{limit_path}.collision_strategy must be 'ENQUEUE' or 'CANCEL_NEW'"
+                )
+
         triggers = deploy_meta.get("triggers")
         if isinstance(triggers, list):
             for index, trigger in enumerate(triggers):
@@ -491,8 +512,8 @@ def validate_flow_coverage(
         raise ValueError("Flow coverage mismatch. " + " | ".join(errors))
 
 
-def _flow_accepts_time_offset_seconds(flow_obj: Any) -> bool:
-    """Return True when the flow function can accept `time_offset_seconds`.
+def _flow_accepts_parameter(flow_obj: Any, parameter: str) -> bool:
+    """Return True when the flow function accepts the named parameter.
 
     Prefect Flow objects expose the wrapped function via `.fn`. If a flow object
     does not expose an inspectable function (e.g. certain test doubles), we skip
@@ -503,7 +524,7 @@ def _flow_accepts_time_offset_seconds(flow_obj: Any) -> bool:
         return True
 
     signature = inspect.signature(flow_fn)
-    return "time_offset_seconds" in signature.parameters
+    return parameter in signature.parameters
 
 
 def build_deploy_specs(
@@ -530,8 +551,8 @@ def build_deploy_specs(
         flow_info = resolved_flows[key]
 
         # Check if time_offset_seconds is indeed accepted by the flows specified in deploy config
-        if key in time_offset_targets and not _flow_accepts_time_offset_seconds(
-            flow_info["flow_obj"]
+        if key in time_offset_targets and not _flow_accepts_parameter(
+            flow_info["flow_obj"], "time_offset_seconds"
         ):
             raise ValueError(
                 f"deploy_cfg.flows.{key}.inject_time_offset is enabled, "
@@ -565,7 +586,6 @@ def build_deploy_specs(
         deployment_parameters = dict(flow_params)
         if key in time_offset_targets:
             deployment_parameters["time_offset_seconds"] = time_offset_seconds
-
         specs.append(
             DeploymentSpec(
                 flow_key=key,
@@ -574,6 +594,7 @@ def build_deploy_specs(
                 entrypoint=flow_info["entrypoint"],
                 parameters=deployment_parameters,
                 concurrency_group=deploy_meta.get("concurrency_group"),
+                concurrency_limit=deploy_meta.get("concurrency_limit"),
                 task_runner=deploy_meta.get("task_runner"),
                 cron=cron,
                 work_pool_name=deploy_meta.get("work_pool_name"),
@@ -615,6 +636,18 @@ def create_deployments(
 
         if spec.concurrency_group is not None:
             deployment_kwargs["work_queue_name"] = spec.concurrency_group
+
+        if spec.concurrency_limit is not None:
+            from prefect.client.schemas.objects import (
+                ConcurrencyLimitConfig,
+                ConcurrencyLimitStrategy,
+            )
+
+            concurrency_limit = dict(spec.concurrency_limit)
+            concurrency_limit["collision_strategy"] = ConcurrencyLimitStrategy(
+                concurrency_limit.get("collision_strategy", "ENQUEUE")
+            )
+            deployment_kwargs["concurrency_limit"] = ConcurrencyLimitConfig(**concurrency_limit)
 
         # The worker reloads the flow entrypoint, so runner settings must be
         # present in its runtime environment instead of only on this Flow object
