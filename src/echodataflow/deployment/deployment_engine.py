@@ -13,7 +13,6 @@ from typing import Any, cast
 from prefect.deployments.runner import RunnerDeployment
 from prefect.events import DeploymentEventTrigger
 from prefect.flows import Flow
-from prefect.variables import Variable
 from yaml import safe_load
 
 from echodataflow.deployment.core import (

@@ -1,5 +1,4 @@
 import cartopy.feature as cfeature
-from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 from geopy.distance import distance
 import pandas as pd
 import numpy as np

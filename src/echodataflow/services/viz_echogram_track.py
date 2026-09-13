@@ -2,7 +2,6 @@ from pathlib import Path
 import panel as pn
 import xarray as xr
 from holoviews import opts
-import echoshader
 
 # Configure Panel to prevent automatic refreshes
 pn.config.autoreload = False

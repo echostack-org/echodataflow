@@ -1,8 +1,5 @@
 from bokeh.themes.theme import Theme
-import geoviews.tile_sources as gvts
 
-from bokeh.themes.theme import Theme
-import geoviews.tile_sources as gvts
 
 
 # Plot theme
