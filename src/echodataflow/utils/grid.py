@@ -169,7 +169,6 @@ def get_coastline(boundary_gdf, resolution='10m', projection="epsg:4326"):
     xmin0, ymin0, xmax0, ymax0 = boundary_gdf.total_bounds
 
     # Create boundary boxes
-    boundary_box = sg.box(xmin0 - 5, ymin0 - 5, xmax0 + 5, ymax0 + 5)
     boundary_box_unbuffered = sg.box(xmin0, ymin0, xmax0, ymax0)
     boundary_box_unbuffered_gdf = gpd.GeoDataFrame(
         geometry=[boundary_box_unbuffered], crs=projection

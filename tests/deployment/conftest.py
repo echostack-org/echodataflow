@@ -40,11 +40,6 @@ class FakeConcurrencyLimitStrategy(str, Enum):
     CANCEL_NEW = "CANCEL_NEW"
 
 
-class FakeConcurrencyLimitConfig:
-    def __init__(self, **kwargs):
-        self.__dict__.update(kwargs)
-
-
 @pytest.fixture
 def install_prefect_stubs(monkeypatch):
     def _install(*, sink=None):
