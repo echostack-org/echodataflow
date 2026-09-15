@@ -56,8 +56,8 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 mission = [
-    "echopype @ git+https://github.com/OSOceanAcoustics/echopype.git",
-    "echoshader @ git+https://github.com/OSOceanAcoustics/echoshader.git",
+    "echopype @ git+https://github.com/echostack-org/echopype.git",
+    "echoshader @ git+https://github.com/echostack-org/echoshader.git",
     "echoregions @ git+https://github.com/echostack-org/echoregions.git",
     "opencv-python",
     "dask-image",
