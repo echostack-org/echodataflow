@@ -4,11 +4,59 @@ import pandas as pd
 import pytest
 
 from echodataflow.utils.manifests import (
+    MVBS_COLUMNS_POSTPROCESSING,
+    PREDICTION_COLUMNS_POSTPROCESSING,
+    SV_COLUMNS_POSTPROCESSING,
     filter_time_range,
     manifest_signature_changed,
     read_manifest,
     write_manifest,
 )
+
+
+@pytest.mark.parametrize(
+    ("columns", "date_columns", "status_column", "blank_filename"),
+    [
+        (
+            SV_COLUMNS_POSTPROCESSING,
+            ["timestamp", "first_ping_time", "last_ping_time", "Sv_deleted_at"],
+            "raw2Sv_status",
+            "Sv_filename",
+        ),
+        (
+            MVBS_COLUMNS_POSTPROCESSING,
+            ["slice_start", "slice_end", "first_ping_time", "last_ping_time"],
+            "MVBS_status",
+            None,
+        ),
+        (
+            PREDICTION_COLUMNS_POSTPROCESSING,
+            ["slice_start", "slice_end", "first_ping_time", "last_ping_time"],
+            "prediction_status",
+            "prediction_filename",
+        ),
+    ],
+)
+def test_postprocessing_manifest_restores_blank_text_columns(
+    tmp_path, columns, date_columns, status_column, blank_filename
+):
+    path = tmp_path / "ledger.csv"
+    row = {column: pd.NA for column in columns}
+    row[status_column] = "failed"
+    row["attempt_count"] = 1
+    pd.DataFrame([row], columns=columns).to_csv(path)
+
+    manifest = read_manifest(path, columns, date_columns)
+    manifest.loc[0, [status_column, "error"]] = ["pending", ""]
+
+    assert manifest.loc[0, "error"] == ""
+    assert str(manifest["error"].dtype) == "string"
+    if blank_filename:
+        manifest.loc[0, blank_filename] = "result.zarr"
+        assert manifest.loc[0, blank_filename] == "result.zarr"
+    if "is_partial" in manifest:
+        manifest.loc[0, "is_partial"] = True
+        assert manifest.loc[0, "is_partial"]
 
 
 def test_manifest_signature_detects_missing_and_changed_outputs():

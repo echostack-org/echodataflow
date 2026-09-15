@@ -80,6 +80,24 @@ def read_manifest(path: Path, columns: list[str], date_columns: list[str]) -> pd
         )
     df = df[columns]
 
+    # CSV inference turns an entirely blank text column into float64. Restore
+    # ledger text types before a flow assigns status, filenames, or error text.
+    if columns in (
+        SV_COLUMNS_POSTPROCESSING,
+        MVBS_COLUMNS_POSTPROCESSING,
+        PREDICTION_COLUMNS_POSTPROCESSING,
+    ):
+        text_columns = set(columns) - set(date_columns) - {"attempt_count", "is_partial"}
+        for column in text_columns:
+            df[column] = df[column].astype("string")
+        if "is_partial" in df:
+            df["is_partial"] = df["is_partial"].map(
+                {True: True, False: False, "True": True, "False": False}
+            ).astype("boolean")
+        for column in ("error", "Sv_cleanup_error"):
+            if column in df:
+                df[column] = df[column].fillna("")
+
     # Set datetime columns to UTC
     for column in date_columns:
         if column in df:
