@@ -512,7 +512,7 @@ def build_latest_transect_panel(
                 path_transects,
                 dtype={
                     "transectPart": "string",
-                    "transectNum": "string",
+                    "transectNumber": "string",
                     "transectStart": "string",
                     "transectEnd": "string",
                 },
@@ -521,7 +521,7 @@ def build_latest_transect_panel(
 
         row = transect_df[
             transect_df[
-                "transectNum"
+                "transectNumber"
             ]
             .str.zfill(
                 3

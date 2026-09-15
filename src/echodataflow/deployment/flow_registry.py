@@ -18,10 +18,6 @@ FLOW_REGISTRY: dict[str, FlowRegistration] = {
         entrypoint="echodataflow/flows/flows_acoustics.py:flow_raw2Sv",
         description="Incrementally convert newly available raw sonar files to Sv.",
     ),
-    "raw2Sv_CPS": FlowRegistration(
-        entrypoint="echodataflow/flows/flows_acoustics.py:flow_raw2Sv_CPS",
-        description="Convert newly registered RAW files to Sv using the CPS processing database.",
-    ),
     "create_MVBS": FlowRegistration(
         entrypoint="echodataflow/flows/flows_acoustics.py:flow_create_MVBS",
     ),
@@ -78,9 +74,25 @@ FLOW_REGISTRY: dict[str, FlowRegistration] = {
         entrypoint="echodataflow/flows/flows_transect.py:flow_transect_update",
         description="Process updates to transect start/end information.",
     ),
-    "process_CPS": FlowRegistration(
-        entrypoint="echodataflow/flows/flows_CPS.py:flow_process_CPS",
-        description="Process CPS acoustic data for new or updated transect segments.",
+    "process_Sv_CPS": FlowRegistration(
+        entrypoint=(
+            "echodataflow/flows/flows_CPS_sv.py:"
+            "flow_process_Sv_CPS"
+        ),
+        description=(
+            "Process generic Sv stores into per-file "
+            "CPS-ready Sv products."
+        ),
+    ),
+    "process_transect_CPS": FlowRegistration(
+        entrypoint=(
+            "echodataflow/flows/flows_CPS_transect.py:"
+            "flow_process_transect_CPS"
+        ),
+        description=(
+            "Assemble CPS-ready Sv products by transect, "
+            "classify CPS targets, and compute NASC."
+        ),
     ),
     "simulate_transects": FlowRegistration(
         entrypoint=(

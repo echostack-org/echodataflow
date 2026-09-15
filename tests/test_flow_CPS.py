@@ -1,8 +1,5 @@
 import pandas as pd
 
-from echodataflow.flows import flows_CPS
-
-
 def test_process_cps_retries_completed_transect_missing_outputs(
     monkeypatch,
     tmp_path,

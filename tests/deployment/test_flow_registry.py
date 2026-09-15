@@ -61,13 +61,26 @@ def test_postprocessing_flows_are_registered_with_realtime_modules():
     )
 
 
-def test_flow_registry_contains_process_cps_entrypoint():
-    registry = importlib.import_module("echodataflow.deployment.flow_registry")
+def test_flow_registry_contains_process_cps_entrypoints():
+    registry = importlib.import_module(
+        "echodataflow.deployment.flow_registry"
+    )
 
-    registration = registry.FLOW_REGISTRY["process_CPS"]
+    sv_registration = registry.FLOW_REGISTRY[
+        "process_Sv_CPS"
+    ]
+    transect_registration = registry.FLOW_REGISTRY[
+        "process_transect_CPS"
+    ]
 
-    assert registration.entrypoint == (
-        "echodataflow/flows/flows_CPS.py:flow_process_CPS"
+    assert sv_registration.entrypoint == (
+        "echodataflow/flows/flows_CPS_sv.py:"
+        "flow_process_Sv_CPS"
+    )
+
+    assert transect_registration.entrypoint == (
+        "echodataflow/flows/flows_CPS_transect.py:"
+        "flow_process_transect_CPS"
     )
 
 def test_resolve_registered_flows_defaults_to_recipe_key(
