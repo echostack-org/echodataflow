@@ -128,6 +128,20 @@ def test_new_sv_ledger_accepts_utc_ping_times():
     assert str(ledger["first_ping_time"].dtype) == "datetime64[ns, UTC]"
 
 
+def test_new_mvbs_and_prediction_ledgers_accept_utc_ping_times():
+    sv = _sv_ledger()
+    mvbs = build_MVBS_ledger(sv)
+    prediction = build_prediction_ledger(mvbs)
+    ping_time = pd.Timestamp("2026-06-18 17:16:01.148682+00:00")
+
+    for ledger in (mvbs, prediction):
+        idx = ledger.index[0]
+        ledger.loc[idx, ["first_ping_time", "last_ping_time"]] = [ping_time, ping_time]
+        assert ledger.loc[idx, "first_ping_time"] == ping_time
+        assert ledger.loc[idx, "last_ping_time"] == ping_time
+        assert str(ledger["first_ping_time"].dtype) == "datetime64[ns, UTC]"
+
+
 def test_ledgers_predeclare_raw_files_and_mvbs_slices():
     sv = _sv_ledger(("pending",) * 4)
     mvbs = build_MVBS_ledger(sv, slice_mins=20)
