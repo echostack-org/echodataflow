@@ -132,11 +132,17 @@ def build_Sv_ledger(raw_files: pd.DataFrame) -> pd.DataFrame:
     ledger["Sv_filename"] = pd.NA
     ledger["raw2Sv_status"] = "pending"
     ledger["attempt_count"] = 0
-    ledger["first_ping_time"] = pd.NaT
-    ledger["last_ping_time"] = pd.NaT
+    ledger["first_ping_time"] = pd.Series(
+        pd.NaT, index=ledger.index, dtype="datetime64[ns, UTC]"
+    )
+    ledger["last_ping_time"] = pd.Series(
+        pd.NaT, index=ledger.index, dtype="datetime64[ns, UTC]"
+    )
     ledger["error"] = ""
     ledger["Sv_cleanup_status"] = "pending"
-    ledger["Sv_deleted_at"] = pd.NaT
+    ledger["Sv_deleted_at"] = pd.Series(
+        pd.NaT, index=ledger.index, dtype="datetime64[ns, UTC]"
+    )
     ledger["Sv_cleanup_error"] = ""
     return ledger.sort_values("timestamp").reset_index(drop=True)
 

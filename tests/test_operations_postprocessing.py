@@ -115,6 +115,19 @@ def _sv_ledger(statuses=("completed", "completed", "completed", "completed")):
     return ledger
 
 
+def test_new_sv_ledger_accepts_utc_ping_times():
+    ledger = build_Sv_ledger(
+        pd.DataFrame({"s3_path": ["survey/IWCPS-D20250611-T000100.raw"]})
+    )
+    ping_time = pd.Timestamp("2026-06-18 17:16:01.148682+00:00")
+
+    ledger.loc[0, ["first_ping_time", "last_ping_time"]] = [ping_time, ping_time]
+
+    assert ledger.loc[0, "first_ping_time"] == ping_time
+    assert ledger.loc[0, "last_ping_time"] == ping_time
+    assert str(ledger["first_ping_time"].dtype) == "datetime64[ns, UTC]"
+
+
 def test_ledgers_predeclare_raw_files_and_mvbs_slices():
     sv = _sv_ledger(("pending",) * 4)
     mvbs = build_MVBS_ledger(sv, slice_mins=20)
