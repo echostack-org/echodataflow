@@ -25,10 +25,7 @@ from echodataflow.services.spasso.plotting import (
 def create_spasso_app(config: dict):
     """Create the live SPASSO dashboard from configuration."""
 
-    # ------------------------------------------------------------------
     # Configuration
-    # ------------------------------------------------------------------
-
     dashboard_config = config["dashboard"]
     products_config = config["products"]
     currents_config = config.get("currents")
@@ -86,13 +83,9 @@ def create_spasso_app(config: dict):
         400,
     )
 
-    # ------------------------------------------------------------------
     # Initial navigation
-    #
     # Load the complete available track. navigation_history_hours is
-    # used only to control which part is highlighted as "recent".
-    # ------------------------------------------------------------------
-
+    # used only to control which part is highlighted as "recent"
     navigation = load_navigation(
         navigation_dir=navigation_dir,
     )
@@ -113,10 +106,7 @@ def create_spasso_app(config: dict):
         radius_km=map_radius_km,
     )
 
-    # ------------------------------------------------------------------
     # Shared dynamic navigation
-    # ------------------------------------------------------------------
-
     navigation_pipe = Pipe(
         data=navigation
     )
@@ -134,14 +124,10 @@ def create_spasso_app(config: dict):
         streams=[navigation_pipe],
     )
 
-    # ------------------------------------------------------------------
-    # SPASSO products
-    #
-    # These are deliberately created ONCE.
-    #
-    # The periodic callback below only updates navigation.
-    # ------------------------------------------------------------------
 
+    # SPASSO products
+    # These are deliberately created ONCE
+    # The periodic callback below only updates navigation
     plots_by_tab: dict[str, list] = {}
 
     for product_name, product_config in products_config.items():
@@ -170,10 +156,7 @@ def create_spasso_app(config: dict):
             [],
         ).append(plot)
 
-    # ------------------------------------------------------------------
     # Surface currents
-    # ------------------------------------------------------------------
-
     if currents_config is not None:
 
         currents_plot = create_currents_plot(
@@ -194,7 +177,7 @@ def create_spasso_app(config: dict):
             "Currents / Diagnostics",
         )
 
-        # Put currents first in its tab, matching the previous dashboard.
+        # Put currents first in its tab, matching the previous dashboard
         plots_by_tab.setdefault(
             tab_name,
             [],
@@ -203,10 +186,7 @@ def create_spasso_app(config: dict):
             currents_plot,
         )
 
-    # ------------------------------------------------------------------
     # Status
-    # ------------------------------------------------------------------
-
     status = pn.pane.Markdown(
         (
             f"**Ship position:** "
@@ -217,10 +197,7 @@ def create_spasso_app(config: dict):
         )
     )
 
-    # ------------------------------------------------------------------
     # Tabs
-    # ------------------------------------------------------------------
-
     tabs_content = []
 
     for tab_name, plots in plots_by_tab.items():
@@ -244,17 +221,11 @@ def create_spasso_app(config: dict):
         sizing_mode="stretch_width",
     )
 
-    # ------------------------------------------------------------------
     # Navigation refresh
-    #
-    # IMPORTANT:
-    # Only navigation is reloaded here.
-    #
-    # SPASSO NetCDF files and rasterized products are NOT recreated.
+    # IMPORTANT: Only navigation is reloaded here
+    # SPASSO NetCDF files and rasterized products are NOT recreated
     # This preserves the current zoom/pan behavior and avoids repeatedly
-    # processing the heavy gridded products.
-    # ------------------------------------------------------------------
-
+    # processing the heavy gridded products
     def scheduled_update():
         """Update only the ship-navigation layer."""
 
@@ -294,10 +265,7 @@ def create_spasso_app(config: dict):
         period=refresh_seconds * 1000,
     )
 
-    # ------------------------------------------------------------------
     # Dashboard
-    # ------------------------------------------------------------------
-
     title = dashboard_config.get(
         "title",
         "SPASSO / Ship Navigation",
