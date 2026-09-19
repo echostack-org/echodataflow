@@ -89,4 +89,8 @@ FLOW_REGISTRY: dict[str, FlowRegistration] = {
         ),
         description="Simulate realtime transect updates for testing.",
     ),
+    "fetch_spasso": FlowRegistration(
+        entrypoint="echodataflow/flows/flows_spasso.py:flow_fetch_spasso",
+        description="Incrementally fetch newly available SPASSO products over SFTP.",
+    ),
 }

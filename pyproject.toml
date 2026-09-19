@@ -43,6 +43,7 @@ dependencies = [
     "openpyxl",
     "pandas",
     "panel",
+    "paramiko",
     "prefect[shell,dask]==3.8.4",
     "PyYAML",
     "s3fs",
