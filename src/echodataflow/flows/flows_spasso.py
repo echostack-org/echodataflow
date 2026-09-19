@@ -156,7 +156,6 @@ def flow_fetch_spasso(
 
     # Download settings
     settings = SpassoDownloadSettings(
-        remote_directory=remote_path,
         local_directory=str(local_dir),
     )
 
