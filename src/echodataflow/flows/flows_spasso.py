@@ -36,24 +36,15 @@ def flow_fetch_spasso(
 
     logger = get_run_logger()
 
-    # ------------------------------------------------------------------
     # Credentials
-    # ------------------------------------------------------------------
-
     username = Secret.load(username_secret).get()
     password = Secret.load(password_secret).get()
 
-    # ------------------------------------------------------------------
     # Local output directory
-    # ------------------------------------------------------------------
-
     local_dir = Path(path_main)
     local_dir.mkdir(parents=True, exist_ok=True)
 
-    # ------------------------------------------------------------------
     # SFTP connection settings
-    # ------------------------------------------------------------------
-
     connection = SpassoConnectionSettings(
         host=host,
         port=port,
@@ -61,10 +52,7 @@ def flow_fetch_spasso(
         password=password,
     )
 
-    # ------------------------------------------------------------------
     # List remote SPASSO files
-    # ------------------------------------------------------------------
-
     remote_files = task_list_spasso_files.with_options(
         retries=task_retries,
         retry_delay_seconds=task_retry_delay_seconds,
@@ -78,23 +66,6 @@ def flow_fetch_spasso(
         len(remote_files),
     )
 
-    # ------------------------------------------------------------------
-    # Select latest file independently for each requested product family
-    #
-    # Example:
-    #
-    #   Copernicus_PHY
-    #       -> 20260915_Copernicus_PHY.nc
-    #
-    #   Copernicus_SST_L4
-    #       -> 20260914_Copernicus_SST_L4.nc
-    #
-    #   Copernicus_SSS_L4
-    #       -> 20260908_Copernicus_SSS_L4.nc
-    #
-    # This intentionally allows products to have different dates.
-    # ------------------------------------------------------------------
-
     if not product_patterns:
         raise ValueError(
             "At least one SPASSO product must be provided in "
@@ -105,8 +76,7 @@ def flow_fetch_spasso(
 
     for product in product_patterns:
 
-        # Exact product-family matching.
-        #
+        # Exact product-family matching
         # This is important because "Copernicus_PHY" should match:
         #
         #   20260915_Copernicus_PHY.nc
@@ -116,7 +86,7 @@ def flow_fetch_spasso(
         #   20260915_FTLE_Copernicus_PHY.nc
         #   20260915_OW_Copernicus_PHY.nc
         #   20260915_KE_Copernicus_PHY.nc
-        #
+        
         pattern = re.compile(
             rf"^\d{{8}}_{re.escape(product)}\.nc$"
         )
@@ -135,7 +105,7 @@ def flow_fetch_spasso(
             continue
 
         # Filenames start with YYYYMMDD, so lexical ordering gives us
-        # the newest product date.
+        # the newest product date
         latest = max(
             matches,
             key=lambda item: item.filename[:8],
@@ -155,23 +125,9 @@ def flow_fetch_spasso(
         )
         return
 
-    # ------------------------------------------------------------------
-    # Remove duplicate selections, just in case.
-    # ------------------------------------------------------------------
-
-    selected = list(
-        {
-            item.filename: item
-            for item in selected
-        }.values()
-    )
-
-    # ------------------------------------------------------------------
-    # Check which selected files already exist locally.
-    #
-    # If filename AND size match, there is nothing to download.
-    # If the file is absent or its size differs, download it.
-    # ------------------------------------------------------------------
+    # Check which selected files already exist locally
+    # If filename AND size match, there is nothing to download
+    # If the file is absent or its size differs, download it
 
     existing = {
         path.name: path.stat().st_size
@@ -198,19 +154,13 @@ def flow_fetch_spasso(
         )
         return
 
-    # ------------------------------------------------------------------
     # Download settings
-    # ------------------------------------------------------------------
-
     settings = SpassoDownloadSettings(
         remote_directory=remote_path,
         local_directory=str(local_dir),
     )
 
-    # ------------------------------------------------------------------
     # Submit downloads concurrently through Prefect
-    # ------------------------------------------------------------------
-
     futures = {}
 
     for item in to_download:
@@ -227,12 +177,8 @@ def flow_fetch_spasso(
 
         futures[future] = item
 
-    # ------------------------------------------------------------------
     # Collect results
-    # ------------------------------------------------------------------
-
     errors = []
-
     for future in as_completed(futures):
 
         item = futures[future]
@@ -255,10 +201,7 @@ def flow_fetch_spasso(
                 exc,
             )
 
-    # ------------------------------------------------------------------
     # Fail the flow if one or more downloads failed.
-    # ------------------------------------------------------------------
-
     if errors:
         raise RuntimeError(
             f"{len(errors)} SPASSO download(s) failed "
