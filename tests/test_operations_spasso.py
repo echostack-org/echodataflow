@@ -134,7 +134,6 @@ def test_download_spasso_file(monkeypatch, tmp_path):
     )
 
     settings = SpassoDownloadSettings(
-        remote_directory="remote",
         local_directory=str(tmp_path),
     )
 
@@ -195,7 +194,6 @@ def test_download_spasso_file_closes_connection_on_error(
     )
 
     settings = SpassoDownloadSettings(
-        remote_directory="remote",
         local_directory=str(tmp_path),
     )
 

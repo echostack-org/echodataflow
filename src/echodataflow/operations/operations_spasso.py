@@ -20,7 +20,8 @@ class SpassoConnectionSettings:
 
 @dataclass(frozen=True)
 class SpassoDownloadSettings:
-    local_directory: str
+    """Local settings for SPASSO downloads."""
+
     local_directory: str
 
 
