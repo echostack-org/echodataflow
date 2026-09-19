@@ -12,8 +12,6 @@ import panel as pn
 
 
 CRS = ccrs.PlateCarree()
-
-
 def geographic_bounds(
     latitude: float,
     longitude: float,
@@ -93,10 +91,7 @@ def navigation_layer(
         latest["latitude"]
     )
 
-    # ------------------------------------------------------------------
     # Complete ship track
-    # ------------------------------------------------------------------
-
     all_coordinates = navigation[
         ["longitude", "latitude"]
     ].to_numpy()
@@ -111,10 +106,7 @@ def navigation_layer(
         alpha=0.6,
     )
 
-    # ------------------------------------------------------------------
     # Recent ship track
-    # ------------------------------------------------------------------
-
     latest_time = navigation[
         "timestamp_utc"
     ].max()
@@ -128,7 +120,7 @@ def navigation_layer(
     ].copy()
 
     # Include the final historical point so that the recent track
-    # connects cleanly to the complete track.
+    # connects cleanly to the complete track
     older = navigation.loc[
         navigation["timestamp_utc"] < cutoff
     ]
@@ -154,10 +146,7 @@ def navigation_layer(
         color="deepskyblue",
     )
 
-    # ------------------------------------------------------------------
     # Current ship position
-    # ------------------------------------------------------------------
-
     ship = gv.Points(
         [
             (
