@@ -6,11 +6,13 @@ from pathlib import Path
 from sqlalchemy import (
     BigInteger,
     Column,
+    Float,
     Index,
     MetaData,
     Table,
     Text,
     create_engine,
+    delete,
     insert,
     select,
     update,
@@ -76,6 +78,37 @@ sv_cps = Table(
         server_default=func.current_timestamp(),
     ),
 )
+
+
+transects = Table(
+    "transects",
+    metadata,
+    Column("transect_id", Text, primary_key=True),
+    Column("transect_part", Text),
+    Column("transect_number", Text),
+    Column("start_time", Text, nullable=False),
+    Column("end_time", Text, nullable=False),
+    Column("status", Text, nullable=False, server_default="pending"),
+    Column("coverage_start", Text),
+    Column("coverage_end", Text),
+    Column("error", Text, nullable=False, server_default=""),
+    Column(
+        "created_at",
+        Text,
+        nullable=False,
+        server_default=func.current_timestamp(),
+    ),
+    Column(
+        "updated_at",
+        Text,
+        nullable=False,
+        server_default=func.current_timestamp(),
+    ),
+    Column("last_processed_at", Text),
+)
+
+Index("idx_transects_status", transects.c.status)
+Index("idx_transects_start_time", transects.c.start_time)
 
 Index("idx_sv_cps_status", sv_cps.c.status)
 Index("idx_sv_cps_first_ping_time", sv_cps.c.first_ping_time)
@@ -591,3 +624,230 @@ def get_completed_cps_files(
         rows = conn.execute(stmt).all()
 
     return [row.cps_filename for row in rows]
+
+def register_transect(
+    db_path: str | Path,
+    transect_part,
+    transect_number,
+    start_time,
+    end_time,
+) -> bool:
+    """Register a transect definition in the processing ledger."""
+
+    transect_part = str(transect_part)
+    transect_number = str(transect_number)
+
+    start_time = _timestamp_string(start_time)
+    end_time = _timestamp_string(end_time)
+
+    transect_id = (
+        f"{transect_number}|"
+        f"{transect_part}|"
+        f"{start_time}|"
+        f"{end_time}"
+    )
+
+    engine = _engine(db_path)
+
+    values = {
+        "transect_id": transect_id,
+        "transect_part": transect_part,
+        "transect_number": transect_number,
+        "start_time": start_time,
+        "end_time": end_time,
+        "status": "pending",
+    }
+
+    with engine.begin() as conn:
+        existing = conn.execute(
+            select(transects.c.transect_id).where(
+                transects.c.transect_id == transect_id
+            )
+        ).first()
+
+        if existing is not None:
+            return False
+
+        if engine.dialect.name == "postgresql":
+            stmt = (
+                postgresql_insert(transects)
+                .values(**values)
+                .on_conflict_do_nothing(
+                    index_elements=[transects.c.transect_id]
+                )
+            )
+
+        elif engine.dialect.name == "sqlite":
+            stmt = (
+                sqlite_insert(transects)
+                .values(**values)
+                .on_conflict_do_nothing(
+                    index_elements=[transects.c.transect_id]
+                )
+            )
+
+        else:
+            stmt = insert(transects).values(**values)
+
+        result = conn.execute(stmt)
+
+        return result.rowcount == 1
+
+def get_transects_to_process(
+    db_path: str | Path,
+) -> list[dict]:
+    """Return transects that still require processing."""
+
+    stmt = (
+        select(transects)
+        .where(
+            transects.c.status.in_(
+                ("pending", "incomplete", "failed")
+            )
+        )
+        .order_by(
+            transects.c.start_time,
+            transects.c.transect_id,
+        )
+    )
+
+    engine = _engine(db_path)
+
+    with engine.connect() as conn:
+        rows = conn.execute(stmt).mappings().all()
+
+    return [dict(row) for row in rows]
+
+def get_latest_completed_transect(
+    db_path: str | Path,
+) -> dict | None:
+    """Return the most recently completed transect."""
+
+    stmt = (
+        select(transects)
+        .where(
+            transects.c.status == "completed"
+        )
+        .order_by(
+            transects.c.end_time.desc(),
+            transects.c.transect_id.desc(),
+        )
+        .limit(1)
+    )
+
+    engine = _engine(db_path)
+
+    with engine.connect() as conn:
+        row = conn.execute(stmt).mappings().first()
+
+    if row is None:
+        return None
+
+    return dict(row)
+
+def mark_transect_processing(
+    db_path: str | Path,
+    transect_id: str,
+) -> None:
+    """Mark a transect as currently being processed."""
+
+    engine = _engine(db_path)
+
+    with engine.begin() as conn:
+        conn.execute(
+            update(transects)
+            .where(
+                transects.c.transect_id == transect_id
+            )
+            .values(
+                status="processing",
+                error="",
+                updated_at=func.current_timestamp(),
+            )
+        )
+
+
+def mark_transect_completed(
+    db_path: str | Path,
+    transect_id: str,
+    coverage_start,
+    coverage_end,
+) -> None:
+    """Mark a transect as successfully processed."""
+
+    engine = _engine(db_path)
+
+    with engine.begin() as conn:
+        conn.execute(
+            update(transects)
+            .where(
+                transects.c.transect_id == transect_id
+            )
+            .values(
+                status="completed",
+                coverage_start=_timestamp_string(coverage_start),
+                coverage_end=_timestamp_string(coverage_end),
+                error="",
+                last_processed_at=func.current_timestamp(),
+                updated_at=func.current_timestamp(),
+            )
+        )
+
+
+def mark_transect_incomplete(
+    db_path: str | Path,
+    transect_id: str,
+    coverage_start=None,
+    coverage_end=None,
+) -> None:
+    """Mark a transect as waiting for sufficient CPS coverage."""
+
+    values = {
+        "status": "incomplete",
+        "error": "",
+        "updated_at": func.current_timestamp(),
+    }
+
+    if coverage_start is not None:
+        values["coverage_start"] = _timestamp_string(
+            coverage_start
+        )
+
+    if coverage_end is not None:
+        values["coverage_end"] = _timestamp_string(
+            coverage_end
+        )
+
+    engine = _engine(db_path)
+
+    with engine.begin() as conn:
+        conn.execute(
+            update(transects)
+            .where(
+                transects.c.transect_id == transect_id
+            )
+            .values(**values)
+        )
+
+
+def mark_transect_failed(
+    db_path: str | Path,
+    transect_id: str,
+    error: str,
+) -> None:
+    """Mark transect processing as failed."""
+
+    engine = _engine(db_path)
+
+    with engine.begin() as conn:
+        conn.execute(
+            update(transects)
+            .where(
+                transects.c.transect_id == transect_id
+            )
+            .values(
+                status="failed",
+                error=str(error),
+                updated_at=func.current_timestamp(),
+            )
+        )

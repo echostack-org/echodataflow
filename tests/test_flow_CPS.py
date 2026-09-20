@@ -1,5 +1,11 @@
 import pandas as pd
 
+from echodataflow.flows import flows_CPS_transect
+from echodataflow.utils.processing_ledger import (
+    initialize_ledger,
+    register_transect,
+)
+
 def test_process_cps_retries_completed_transect_missing_outputs(
     monkeypatch,
     tmp_path,
@@ -21,16 +27,24 @@ def test_process_cps_retries_completed_transect_missing_outputs(
     )
 
     # The transect is already present in the snapshot.
-    # Previously this meant CPS would never reconsider it.
+    # It must still be reconsidered if CPS/NASC outputs are missing.
     transect.to_csv(transect_csv, index=False)
     transect.to_csv(snapshot_csv, index=False)
 
-    # flow_process_CPS requires the processing ledger to exist.
-    (path_main / "processing.db").touch()
+    db_path = path_main / "processing.db"
+    initialize_ledger(db_path)
+
+    register_transect(
+        db_path=db_path,
+        transect_part="001",
+        transect_number="001",
+        start_time="2024-07-07T00:30:00Z",
+        end_time="2024-07-07T00:35:00Z",
+    )
 
     calls = []
 
-    def fake_get_completed_sv_files(
+    def fake_get_completed_cps_files(
         db_path,
         start_time=None,
         end_time=None,
@@ -45,12 +59,12 @@ def test_process_cps_retries_completed_transect_missing_outputs(
         return []
 
     monkeypatch.setattr(
-        flows_CPS,
-        "get_completed_sv_files",
-        fake_get_completed_sv_files,
+        flows_CPS_transect,
+        "get_completed_cps_files",
+        fake_get_completed_cps_files,
     )
 
-    flows_CPS.flow_process_CPS.fn(
+    flows_CPS_transect.flow_process_transect_CPS.fn(
         path_transect_csv=str(transect_csv),
         path_snapshot_csv=str(snapshot_csv),
         path_main=str(path_main),
@@ -58,7 +72,5 @@ def test_process_cps_retries_completed_transect_missing_outputs(
 
     output = capsys.readouterr().out
 
-    # Even though the snapshot already contains transect 001,
-    # it must still be checked because CPS/NASC outputs are missing.
     assert len(calls) == 1
-    assert "No Sv data for transect_001" in output
+    assert "No CPS-ready Sv data for transect_001" in output

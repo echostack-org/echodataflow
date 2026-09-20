@@ -1,6 +1,6 @@
 from pathlib import Path
+from time import perf_counter
 
-import echopype as ep
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -8,15 +8,18 @@ from prefect import flow
 from prefect_dask import DaskTaskRunner
 
 from echodataflow.flows.cps_helpers import (
-    _dilate_7x7,
     _export_nasc_to_echoview_csv,
-    _pick_channel_by_frequency,
 )
 from echodataflow.tasks.tasks_acoustics import (
     task_compute_NASC_from_masked_Sv,
 )
 from echodataflow.utils.processing_ledger import (
     get_completed_cps_files,
+    get_transects_to_process,
+    mark_transect_completed,
+    mark_transect_failed,
+    mark_transect_incomplete,
+    mark_transect_processing,
     resolve_database,
 )
 
@@ -30,25 +33,19 @@ def flow_process_transect_CPS(
     path_snapshot_csv: str,
     path_main: str,
     processing_db: str = "processing.db",
-    mask_mode: str = "cps",
-    fallback_sv_threshold: float = -70,
     range_bin: str = "10m",
     dist_bin: str = "0.5nmi",
     nasc_process_id: int = 1928,
     exclude_before: str | None = None,
 ):
     """
-    Assemble per-file CPS-ready Sv products by transect,
-    apply transect-context CPS classification, and compute NASC.
+    Assemble fully processed per-file CPS Sv products by transect
+    and compute NASC.
     """
 
     path_main = Path(path_main)
 
-    path_transect = Path(path_transect_csv)
-    path_snapshot = Path(path_snapshot_csv)
-
     path_cps_sv = path_main / "CPS_Sv"
-    path_cps = path_main / "CPS_Masks_Zarr"
     path_bottom = path_main / "CPS_Seafloor_CSVs"
     path_nasc = path_main / "CPS_NASC_Zarr"
     path_nasc_csv = path_main / "CPS_NASC_CSV"
@@ -59,7 +56,6 @@ def flow_process_transect_CPS(
     )
 
     for path in [
-        path_cps,
         path_bottom,
         path_nasc,
         path_nasc_csv,
@@ -70,95 +66,8 @@ def flow_process_transect_CPS(
         )
 
     # ---------------------------------------------------------
-    # Select eligible completed transects
+    # Select transects requiring processing from the ledger
     # ---------------------------------------------------------
-
-    current = pd.read_csv(
-        path_transect,
-        dtype={
-            "transectPart": "string",
-            "transectNumber": "string",
-            "transectStart": "string",
-            "transectEnd": "string",
-        },
-    )
-
-    eligible = current.copy()
-
-    eligible["transectStart"] = pd.to_datetime(
-        eligible["transectStart"],
-        utc=True,
-        errors="coerce",
-    )
-
-    eligible["transectEnd"] = pd.to_datetime(
-        eligible["transectEnd"],
-        utc=True,
-        errors="coerce",
-    )
-
-    if exclude_before is not None:
-        cutoff = pd.Timestamp(exclude_before)
-
-        if cutoff.tzinfo is None:
-            cutoff = cutoff.tz_localize("UTC")
-        else:
-            cutoff = cutoff.tz_convert("UTC")
-
-        eligible = eligible.loc[
-            eligible["transectStart"] >= cutoff
-        ].copy()
-
-    completed = eligible.dropna(
-        subset=[
-            "transectPart",
-            "transectStart",
-            "transectEnd",
-        ]
-    ).copy()
-
-    pending_rows = []
-
-    for _, transect in completed.iterrows():
-
-        name = (
-            f"transect_"
-            f"{transect['transectPart']}"
-        )
-
-        cps_output = (
-            path_cps
-            / f"{name}_CPS.zarr"
-        )
-
-        nasc_output = (
-            path_nasc
-            / f"{name}_nasc.zarr"
-        )
-
-        if (
-            cps_output.exists()
-            and nasc_output.exists()
-        ):
-            continue
-
-        pending_rows.append(transect)
-
-    changed = pd.DataFrame(
-        pending_rows,
-        columns=current.columns,
-    )
-
-    if changed.empty:
-        current.to_csv(
-            path_snapshot,
-            index=False,
-        )
-
-        print(
-            "No completed transects require CPS processing."
-        )
-        return
 
     if (
         isinstance(db_path, Path)
@@ -170,26 +79,45 @@ def flow_process_transect_CPS(
         )
         return
 
+    transects_to_process = get_transects_to_process(
+        db_path
+    )
+
+    if not transects_to_process:
+        print(
+            "No transects require CPS processing."
+        )
+        return
+
     # ---------------------------------------------------------
     # Process each pending transect
     # ---------------------------------------------------------
 
-    for _, transect in changed.iterrows():
+    for transect in transects_to_process:
+
+        transect_id = transect["transect_id"]
 
         start = pd.to_datetime(
-            transect["transectStart"],
+            transect["start_time"],
             utc=True,
         )
 
         end = pd.to_datetime(
-            transect["transectEnd"],
+            transect["end_time"],
             utc=True,
         )
 
         name = (
             f"transect_"
-            f"{transect['transectPart']}"
+            f"{transect['transect_part']}"
         )
+
+        mark_transect_processing(
+            db_path,
+            transect_id,
+        )
+
+        transect_t0 = perf_counter()
 
         # -----------------------------------------------------
         # Get completed per-file CPS products
@@ -205,6 +133,12 @@ def flow_process_transect_CPS(
             print(
                 f"No CPS-ready Sv data for {name}"
             )
+
+            mark_transect_incomplete(
+                db_path,
+                transect_id,
+            )
+
             continue
 
         cps_paths = [
@@ -235,9 +169,17 @@ def flow_process_transect_CPS(
         #   Blackwell seafloor detection
         #   surface mask
         #   seafloor mask
+        #   background-noise correction
+        #   CPS classification
+        #   final CPS masking
         #
         # Do not recompute those here.
         # -----------------------------------------------------
+
+        print(
+            f"{name}: opening {len(cps_paths)} CPS Sv stores"
+        )
+        stage_t0 = perf_counter()
 
         datasets = [
             xr.open_zarr(
@@ -246,6 +188,16 @@ def flow_process_transect_CPS(
             )
             for path in cps_paths
         ]
+
+        print(
+            f"{name}: opened CPS Sv stores "
+            f"in {perf_counter() - stage_t0:.1f} s"
+        )
+
+        print(
+            f"{name}: assembling continuous transect"
+        )
+        stage_t0 = perf_counter()
 
         ds = xr.concat(
             datasets,
@@ -264,6 +216,11 @@ def flow_process_transect_CPS(
 
         ds = ds.isel(
             ping_time=np.sort(unique_idx)
+        )
+
+        print(
+            f"{name}: transect assembly complete "
+            f"in {perf_counter() - stage_t0:.1f} s"
         )
 
         if ds.sizes.get("ping_time", 0) == 0:
@@ -302,6 +259,14 @@ def flow_process_transect_CPS(
                 f"{expected_end}. "
                 f"Leaving transect pending."
             )
+            
+            mark_transect_incomplete(
+                db_path,
+                transect_id,
+                coverage_start,
+                coverage_end,
+            )
+            
             continue
 
         ds = ds.sel(
@@ -325,6 +290,9 @@ def flow_process_transect_CPS(
             "Sv",
             "depth",
             "valid_water_column",
+            "Sv_corrected",
+            "final_cps_mask",
+            "Sv_masked",
         ]
 
         missing_variables = [
@@ -340,10 +308,6 @@ def flow_process_transect_CPS(
                 f"{missing_variables}"
             )
             continue
-
-        valid_water_column = (
-            ds["valid_water_column"]
-        )
 
         # -----------------------------------------------------
         # Reconstruct transect bottom line from the per-file
@@ -428,297 +392,76 @@ def flow_process_transect_CPS(
             )
 
         # -----------------------------------------------------
-        # Background-noise correction
-        #
-        # Keep this at transect level because ping_num=20
-        # depends on temporal neighbours across RAW boundaries.
+        # Expensive CPS processing is intentionally NOT done
+        # here. Each CPS_Sv file already contains Sv_corrected,
+        # final_cps_mask, and Sv_masked. Transect processing is
+        # limited to assembly, slicing, NASC, and export.
         # -----------------------------------------------------
-
-        try:
-            ds = (
-                ep.clean
-                .remove_background_noise(
-                    ds,
-                    ping_num=20,
-                    range_sample_num=5,
-                    SNR_threshold="5.0dB",
-                )
-            )
-
-        except Exception as exc:
-            print(
-                f"{name}: background-noise "
-                f"removal failed: {exc}"
-            )
-
-            ds["Sv_corrected"] = (
-                ds["Sv"]
-            )
-
-        sv_var = (
-            "Sv_corrected"
-            if "Sv_corrected" in ds
-            else "Sv"
-        )
-
-        # -----------------------------------------------------
-        # Restrict classifier to valid water column.
-        #
-        # This mask was calculated per file and has already
-        # been validated against the previous transect method.
-        # -----------------------------------------------------
-
-        sv_for_cps = (
-            ds[sv_var].where(
-                valid_water_column
-            )
-        )
-
-        # -----------------------------------------------------
-        # CPS classifier
-        #
-        # Keep rolling + dilation at transect level for now
-        # because they require neighbouring pings across file
-        # boundaries.
-        # -----------------------------------------------------
-
-        try:
-
-            ds["Sv_smoothed"] = (
-                sv_for_cps
-                .rolling(
-                    ping_time=3,
-                    range_sample=11,
-                )
-                .mean()
-            )
-
-            ds["variance"] = (
-                10 ** (
-                    sv_for_cps / 10
-                )
-                - 10 ** (
-                    ds["Sv_smoothed"] / 10
-                )
-            ) ** 2
-
-            ds["variance_smoothed"] = (
-                ds["variance"]
-                .rolling(
-                    ping_time=3,
-                    range_sample=11,
-                )
-                .mean()
-            )
-
-            ds["variance_smoothed"] = (
-                10
-                * np.log10(
-                    ds[
-                        "variance_smoothed"
-                    ]
-                    ** 0.5
-                )
-            )
-
-            ds["variance_smoothed"] = (
-                _dilate_7x7(
-                    ds[
-                        "variance_smoothed"
-                    ]
-                )
-            )
-
-            if (
-                mask_mode == "cps"
-                and ds.sizes[
-                    "channel"
-                ] >= 4
-            ):
-
-                ch38 = (
-                    _pick_channel_by_frequency(
-                        ds,
-                        38000,
-                    )
-                )
-
-                ch70 = (
-                    _pick_channel_by_frequency(
-                        ds,
-                        70000,
-                    )
-                )
-
-                ch120 = (
-                    _pick_channel_by_frequency(
-                        ds,
-                        120000,
-                    )
-                )
-
-                ch200 = (
-                    _pick_channel_by_frequency(
-                        ds,
-                        200000,
-                    )
-                )
-
-                # ---------------------------------------------
-                # Variance criteria
-                # ---------------------------------------------
-
-                sd200 = (
-                    ds[
-                        "variance_smoothed"
-                    ].sel(
-                        channel=ch200
-                    )
-                )
-
-                sd120 = (
-                    ds[
-                        "variance_smoothed"
-                    ].sel(
-                        channel=ch120
-                    )
-                )
-
-                mask_sd = (
-                    (sd200 > -65)
-                    & (sd120 > -65)
-                )
-
-                # ---------------------------------------------
-                # Frequency-response criteria
-                # ---------------------------------------------
-
-                ds["Sv_dilated"] = (
-                    _dilate_7x7(
-                        ds["Sv_smoothed"]
-                    )
-                )
-
-                diff = (
-                    ds["Sv_dilated"]
-                    - ds[
-                        "Sv_dilated"
-                    ].sel(
-                        channel=ch38
-                    )
-                )
-
-                mask_frequency = (
-                    (
-                        diff.sel(
-                            channel=ch200
-                        )
-                        > -13.51
-                    )
-                    & (
-                        diff.sel(
-                            channel=ch200
-                        )
-                        < 12.53
-                    )
-                    & (
-                        diff.sel(
-                            channel=ch120
-                        )
-                        > -13.50
-                    )
-                    & (
-                        diff.sel(
-                            channel=ch120
-                        )
-                        < 9.37
-                    )
-                    & (
-                        diff.sel(
-                            channel=ch70
-                        )
-                        > -13.85
-                    )
-                    & (
-                        diff.sel(
-                            channel=ch70
-                        )
-                        < 9.89
-                    )
-                )
-
-                final_mask = (
-                    mask_frequency
-                    & mask_sd
-                    & valid_water_column
-                )
-
-            else:
-
-                final_mask = (
-                    sv_for_cps
-                    > fallback_sv_threshold
-                )
-
-        except Exception as exc:
-
-            print(
-                f"{name}: CPS classifier "
-                f"failed: {exc}"
-            )
-
-            final_mask = (
-                sv_for_cps
-                > fallback_sv_threshold
-            )
-
-        # -----------------------------------------------------
-        # Apply final CPS mask
-        # -----------------------------------------------------
-
-        ds["Sv_masked"] = (
-            ds["Sv"].where(
-                final_mask
-            )
-        )
-
-        # -----------------------------------------------------
-        # Save transect CPS product
-        #
-        # Important: do NOT rechunk ping_time to the complete
-        # transect here. Preserve the existing per-file /
-        # source Dask chunk structure.
-        # -----------------------------------------------------
-
-        cps_path = (
-            path_cps
-            / f"{name}_CPS.zarr"
-        )
-
-        for variable in ds.variables:
-            ds[
-                variable
-            ].encoding.pop(
-                "chunks",
-                None,
-            )
-
-        ds.to_zarr(
-            cps_path,
-            mode="w",
-            consolidated=True,
-        )
 
         # -----------------------------------------------------
         # NASC
         # -----------------------------------------------------
 
+        print(
+            f"{name}: starting NASC calculation"
+        )
+        stage_t0 = perf_counter()
+
+        # Keep only the variables needed by echopype.compute_NASC.
+        #
+        # Important: compute_NASC internally assumes that the first
+        # dataset dimension is the channel-like dimension. After
+        # concatenation, Dataset dimension ordering can differ from
+        # the ordering of the individual Sv variables, so explicitly
+        # transpose the NASC input to:
+        #
+        #   channel, ping_time, range_sample
+        #
+        # This preserves multi-frequency NASC while avoiding an
+        # erroneous extra range_sample grouping dimension.
+        ds_for_nasc = ds[
+            [
+                "Sv_masked",
+                "depth",
+                "latitude",
+                "longitude",
+                "frequency_nominal",
+            ]
+        ].transpose(
+            "channel",
+            "ping_time",
+            "range_sample",
+            missing_dims="ignore",
+        )
+
+        print(
+            f"{name}: NASC dataset dimensions: "
+            f"{list(ds_for_nasc.sizes.keys())}"
+        )
+
+        print(
+            f"{name}: Sv_masked dims: "
+            f"{ds_for_nasc['Sv_masked'].dims}, "
+            f"shape: {ds_for_nasc['Sv_masked'].shape}"
+        )
+
+        print(
+            f"{name}: depth dims: "
+            f"{ds_for_nasc['depth'].dims}, "
+            f"shape: {ds_for_nasc['depth'].shape}"
+        )
+
         ds_nasc = (
             task_compute_NASC_from_masked_Sv(
-                ds_Sv_masked=ds,
+                ds_Sv_masked=ds_for_nasc,
                 range_bin=range_bin,
                 dist_bin=dist_bin,
             )
+        )
+
+        print(
+            f"{name}: NASC calculation complete "
+            f"in {perf_counter() - stage_t0:.1f} s"
         )
 
         nasc_path = (
@@ -726,11 +469,26 @@ def flow_process_transect_CPS(
             / f"{name}_nasc.zarr"
         )
 
+        print(
+            f"{name}: writing NASC Zarr -> {nasc_path}"
+        )
+        stage_t0 = perf_counter()
+
         ds_nasc.to_zarr(
             nasc_path,
             mode="w",
             consolidated=True,
         )
+
+        print(
+            f"{name}: NASC Zarr written "
+            f"in {perf_counter() - stage_t0:.1f} s"
+        )
+
+        print(
+            f"{name}: exporting NASC Echoview CSV"
+        )
+        stage_t0 = perf_counter()
 
         _export_nasc_to_echoview_csv(
             ds_nasc,
@@ -740,10 +498,18 @@ def flow_process_transect_CPS(
         )
 
         print(
-            f"{name}: CPS + NASC complete"
+            f"{name}: NASC CSV exported "
+            f"in {perf_counter() - stage_t0:.1f} s"
         )
 
-    current.to_csv(
-        path_snapshot,
-        index=False,
-    )
+        print(
+            f"{name}: CPS + NASC complete "
+            f"in {perf_counter() - transect_t0:.1f} s total"
+        )
+        
+        mark_transect_completed(
+            db_path,
+            transect_id,
+            coverage_start,
+            coverage_end,
+        )

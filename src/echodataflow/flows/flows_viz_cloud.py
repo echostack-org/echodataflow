@@ -1,3 +1,4 @@
+from os import path
 from pathlib import Path
 import datetime
 import configparser
@@ -10,6 +11,11 @@ import s3fs
 from prefect import flow, get_run_logger
 
 from echodataflow.utils.utils import get_slice_start_end_times
+from echodataflow.utils.processing_ledger import (
+    get_completed_cps_files,
+    get_latest_completed_transect,
+    resolve_database,
+)
 
 
 @flow()
@@ -238,14 +244,13 @@ def _prepare_sv_for_echogram(
 def flow_update_cache_CPS(
     path_CPS: str,
     path_cache: str,
-    path_transect_csv: str,
+    processing_db: str = "processing.db",
     file_CPS_zarr: str = "latest_CPS.zarr",
 ):
-    """Update visualization cache from the latest CPS transect product."""
+    """Update visualization cache from the latest completed CPS transect."""
 
     path_CPS = Path(path_CPS)
     path_cache = Path(path_cache)
-    path_transect_csv = Path(path_transect_csv)
 
     path_cache.mkdir(
         parents=True,
@@ -253,73 +258,124 @@ def flow_update_cache_CPS(
     )
 
     # -----------------------------------------------------
-    # Find latest completed CPS transect
+    # Find latest completed transect from processing ledger
     # -----------------------------------------------------
 
-    def _transect_number(path: Path) -> int:
-        return int(path.name.replace("transect_", "").replace("_CPS.zarr", ""))
+    db_path = resolve_database(
+        path_CPS.parent,
+        processing_db,
+    )
 
-    cps_files = sorted(path_CPS.glob("transect_*_CPS.zarr"), key=_transect_number)
+    transect = get_latest_completed_transect(
+        db_path,
+    )
 
-    if not cps_files:
+    if transect is None:
         print(
-            f"CPS cache not updated: "
-            f"no CPS transects found in {path_CPS}"
+            "CPS cache not updated: "
+            "no completed transects found in processing ledger."
         )
         return
 
-    latest_cps = cps_files[-1]
-
-    transect_number = (
-        latest_cps.name
-        .replace("transect_", "")
-        .replace("_CPS.zarr", "")
+    transect_number = str(
+        transect["transect_part"]
     )
-
-    # -----------------------------------------------------
-    # Read transect metadata
-    # -----------------------------------------------------
-
-    df_transect = pd.read_csv(
-        path_transect_csv,
-        dtype={
-            "transectPart": str,
-            "transectNumber": str,
-        },
-    )
-
-    transect_rows = df_transect[
-        df_transect["transectPart"]
-        == transect_number
-    ]
-
-    if transect_rows.empty:
-        print(
-            f"Transect {transect_number} "
-            f"not found in {path_transect_csv}"
-        )
-        return
-
-    transect_row = transect_rows.iloc[-1]
 
     transect_start = pd.to_datetime(
-        transect_row["transectStart"],
+        transect["start_time"],
         utc=True,
-    ).tz_convert(None)
+    )
 
     transect_end = pd.to_datetime(
-        transect_row["transectEnd"],
+        transect["end_time"],
         utc=True,
-    ).tz_convert(None)
-
-    # -----------------------------------------------------
-    # Open already assembled CPS transect
-    # -----------------------------------------------------
-
-    ds_CPS = xr.open_zarr(
-        latest_cps,
-        consolidated=True,
     )
+
+    # -----------------------------------------------------
+    # Find completed CPS products overlapping transect
+    # -----------------------------------------------------
+
+    cps_filenames = get_completed_cps_files(
+        db_path,
+        start_time=transect_start,
+        end_time=transect_end,
+    )
+
+    cps_paths = [
+        path_CPS / filename
+        for filename in cps_filenames
+        if (path_CPS / filename).exists()
+    ]
+
+    if not cps_paths:
+        print(
+            f"CPS cache not updated: no completed CPS products "
+            f"found for transect {transect_number}."
+        )
+        return
+
+    print(
+        f"Building CPS visualization cache for transect "
+        f"{transect_number} from {len(cps_paths)} CPS files."
+    )
+
+    # -----------------------------------------------------
+    # Assemble CPS transect from per-file CPS products
+    # -----------------------------------------------------
+
+    datasets = [
+        xr.open_zarr(
+            path,
+            consolidated=True,
+        )
+        for path in cps_paths
+    ]
+
+    ds_CPS = xr.concat(
+        datasets,
+        dim="ping_time",
+        data_vars="minimal",
+        coords="minimal",
+        compat="override",
+    ).sortby("ping_time")
+
+    # Remove duplicate ping times at file boundaries.
+    _, unique_idx = np.unique(
+        ds_CPS["ping_time"].values,
+        return_index=True,
+    )
+
+    ds_CPS = ds_CPS.isel(
+        ping_time=np.sort(unique_idx)
+    )
+
+    # Ledger timestamps are UTC-aware; xarray ping_time is
+    # represented as timezone-naive datetime64.
+    transect_start_naive = (
+        transect_start.tz_convert(None)
+    )
+
+    transect_end_naive = (
+        transect_end.tz_convert(None)
+    )
+
+    ds_CPS = ds_CPS.sel(
+        ping_time=slice(
+            transect_start_naive,
+            transect_end_naive,
+        )
+    )
+
+    if ds_CPS.sizes.get("ping_time", 0) == 0:
+        print(
+            f"CPS cache not updated: no pings remain "
+            f"after slicing transect {transect_number}."
+        )
+        return
+
+    # -----------------------------------------------------
+    # Prepare dataset for Echoshader visualization
+    # -----------------------------------------------------
 
     ds_CPS = _prepare_sv_for_echogram(
         ds_CPS,
@@ -328,17 +384,15 @@ def flow_update_cache_CPS(
 
     ds_CPS.attrs.update(
         {
-            "transect_number": str(
-                transect_number
-            ),
+            "transect_number": transect_number,
             "transect_start": str(
-                transect_start
+                transect_start_naive
             ),
             "transect_end": str(
-                transect_end
+                transect_end_naive
             ),
-            "source_cps_file": (
-                latest_cps.name
+            "source_cps_files": len(
+                cps_paths
             ),
         }
     )
