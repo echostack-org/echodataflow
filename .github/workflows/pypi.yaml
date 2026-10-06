@@ -4,8 +4,8 @@ name: Publish to PyPI
 on:
   release:
     types: [released]
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
   workflow_dispatch:
 
 permissions:
