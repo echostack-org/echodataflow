@@ -1,4 +1,4 @@
-name: CI
+name: PR
 
 on:
   pull_request:
@@ -6,30 +6,38 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   tests:
-    name: Python 3.12 tests
-    runs-on: ubuntu-24.04
+    name: Python ${{ matrix.python-version }} tests
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.13", "3.14", "3.15"]
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7.0.0
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
           cache: pip
 
       - name: Install package and test dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[test,mission]"
+          python -m pip install -e ".[test,mission]"
 
       - name: Run tests
         run: |
-          pytest -vv \
+          python -m pytest -vv \
             --ignore=tests/test_operations_predict_hake.py \
             --ignore=tests/test_postprocessing_flow_validation.py
