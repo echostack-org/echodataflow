@@ -14,6 +14,7 @@ from echodataflow.utils.manifests import (
     MVBS_COLUMNS_POSTPROCESSING,
     PREDICTION_COLUMNS_POSTPROCESSING,
     filter_time_range,
+    normalize_ledger_dates,
     read_manifest,
     write_manifest,
 )
@@ -127,7 +128,9 @@ def build_Sv_ledger(raw_files: pd.DataFrame) -> pd.DataFrame:
     invalid = ledger.loc[ledger["timestamp"].isna(), "raw_filename"].tolist()
     if invalid:
         raise ValueError(f"Could not parse timestamps from raw filenames: {invalid}")
-    ledger["timestamp"] = pd.to_datetime(ledger["timestamp"], utc=True)
+    ledger["timestamp"] = pd.to_datetime(ledger["timestamp"], utc=True).astype(
+        "datetime64[ns, UTC]"
+    )
 
     ledger["Sv_filename"] = pd.NA
     ledger["raw2Sv_status"] = "pending"
@@ -156,7 +159,10 @@ def build_MVBS_ledger(
     if no_data_gap_hours <= 0:
         raise ValueError("no_data_gap_hours must be greater than zero")
     if ledger_Sv.empty:
-        return pd.DataFrame(columns=MVBS_COLUMNS_POSTPROCESSING)
+        return normalize_ledger_dates(
+            pd.DataFrame(columns=MVBS_COLUMNS_POSTPROCESSING),
+            ["slice_start", "slice_end", "first_ping_time", "last_ping_time"],
+        )
 
     df_Sv = ledger_Sv.copy()
     df_Sv["timestamp"] = pd.to_datetime(df_Sv["timestamp"], utc=True)
@@ -205,9 +211,9 @@ def build_MVBS_ledger(
             }
         )
     ledger = pd.DataFrame.from_records(records, columns=MVBS_COLUMNS_POSTPROCESSING)
-    for column in ("first_ping_time", "last_ping_time"):
-        ledger[column] = pd.to_datetime(ledger[column], utc=True)
-    return ledger
+    return normalize_ledger_dates(
+        ledger, ["slice_start", "slice_end", "first_ping_time", "last_ping_time"]
+    )
 
 
 def failure_state(attempt_count: int, max_flow_run_attempts: int) -> tuple[int, str]:
@@ -277,7 +283,10 @@ def build_prediction_ledger(
 ) -> pd.DataFrame:
     """Preplan every prediction window and its required MVBS slices."""
     if ledger_MVBS.empty:
-        return pd.DataFrame(columns=PREDICTION_COLUMNS_POSTPROCESSING)
+        return normalize_ledger_dates(
+            pd.DataFrame(columns=PREDICTION_COLUMNS_POSTPROCESSING),
+            ["slice_start", "slice_end", "first_ping_time", "last_ping_time"],
+        )
 
     df_MVBS = ledger_MVBS.copy()
     df_MVBS["slice_start"] = pd.to_datetime(df_MVBS["slice_start"], utc=True)
@@ -317,9 +326,9 @@ def build_prediction_ledger(
             }
         )
     ledger = pd.DataFrame.from_records(records, columns=PREDICTION_COLUMNS_POSTPROCESSING)
-    for column in ("first_ping_time", "last_ping_time"):
-        ledger[column] = pd.to_datetime(ledger[column], utc=True)
-    return ledger
+    return normalize_ledger_dates(
+        ledger, ["slice_start", "slice_end", "first_ping_time", "last_ping_time"]
+    )
 
 
 def read_or_create_ledger(

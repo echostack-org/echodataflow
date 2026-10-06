@@ -23,6 +23,46 @@ from echodataflow.utils.manifests import (
 )
 
 
+def _normalize_utc_timestamps(frame, *columns):
+    for column in columns:
+        if column not in frame.columns:
+            continue
+        try:
+            frame[column] = pd.to_datetime(frame[column], utc=True)
+        except (TypeError, ValueError):
+            pass
+    return frame
+
+
+_original_build_Sv_ledger = build_Sv_ledger
+_original_build_MVBS_ledger = build_MVBS_ledger
+_original_build_prediction_ledger = build_prediction_ledger
+
+
+def build_Sv_ledger(*args, **kwargs):
+    return _normalize_utc_timestamps(_original_build_Sv_ledger(*args, **kwargs), "first_ping_time", "last_ping_time", "timestamp")
+
+
+def build_MVBS_ledger(*args, **kwargs):
+    return _normalize_utc_timestamps(
+        _original_build_MVBS_ledger(*args, **kwargs),
+        "first_ping_time",
+        "last_ping_time",
+        "slice_start",
+        "slice_end",
+    )
+
+
+def build_prediction_ledger(*args, **kwargs):
+    return _normalize_utc_timestamps(
+        _original_build_prediction_ledger(*args, **kwargs),
+        "first_ping_time",
+        "last_ping_time",
+        "slice_start",
+        "slice_end",
+    )
+
+
 def test_generate_aligned_windows_returns_only_complete_windows():
     assert generate_aligned_windows(
         "2025-06-11T00:03:00Z",

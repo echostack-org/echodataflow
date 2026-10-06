@@ -249,3 +249,23 @@ def test_filter_time_range_can_exclude_interval_ending_at_exact_start():
     )
 
     assert selected["name"].tolist() == ["overlaps"]
+
+
+@pytest.mark.parametrize(
+    "stored_value",
+    [None, "", "2025-06-11T21:47:11+0000", "2025-06-11T21:47:11.580137+0000"],
+)
+def test_manifest_dates_use_nanosecond_precision(tmp_path, stored_value):
+    path = tmp_path / "ledger.csv"
+    columns = ["first_ping_time", "last_ping_time"]
+    if stored_value is not None:
+        pd.DataFrame({column: [stored_value] for column in columns}).to_csv(path)
+
+    ledger = read_manifest(path, columns, columns)
+    for column in columns:
+        assert str(ledger[column].dtype) == "datetime64[ns, UTC]"
+        if stored_value:
+            assert ledger.loc[0, column] == pd.Timestamp(stored_value)
+        ping_time = pd.Timestamp("2025-06-11T21:47:11.580137+0000")
+        ledger.loc[0, column] = ping_time
+        assert ledger.loc[0, column] == ping_time

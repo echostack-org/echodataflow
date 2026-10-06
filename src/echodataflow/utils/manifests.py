@@ -64,10 +64,20 @@ PREDICTION_COLUMNS_POSTPROCESSING = [
 ]
 
 
+def normalize_ledger_dates(df: pd.DataFrame, date_columns: list[str]) -> pd.DataFrame:
+    """Normalize ledger dates in place to UTC with nanosecond storage precision."""
+    for column in date_columns:
+        if column in df:
+            df[column] = pd.to_datetime(df[column], format="mixed", utc=True).astype(
+                "datetime64[ns, UTC]"
+            )
+    return df
+
+
 def read_manifest(path: Path, columns: list[str], date_columns: list[str]) -> pd.DataFrame:
     # Return a schema-correct empty manifest on the first run
     if not path.exists():
-        return pd.DataFrame(columns=columns)
+        return normalize_ledger_dates(pd.DataFrame(columns=columns), date_columns)
     df = pd.read_csv(path, index_col=0)
 
     # Validation: catch missing or unexpected columns
@@ -98,12 +108,8 @@ def read_manifest(path: Path, columns: list[str], date_columns: list[str]) -> pd
             if column in df:
                 df[column] = df[column].fillna("")
 
-    # Set datetime columns to UTC
-    for column in date_columns:
-        if column in df:
-            # Ledger updates can mix legacy naive values with UTC-qualified values
-            df[column] = pd.to_datetime(df[column], format="mixed", utc=True)
-    return df
+    # Ledger updates can mix legacy naive values with UTC-qualified values.
+    return normalize_ledger_dates(df, date_columns)
 
 
 def write_manifest(df: pd.DataFrame, path: Path) -> None:
