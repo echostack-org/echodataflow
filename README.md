@@ -20,7 +20,7 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
 
 1. Set up a computing environment using Conda:
    ```bash
-   conda create --name echodataflow -c conda-forge python=3.12
+   conda create --name echodataflow -c conda-forge python=3.13
    conda activate echodataflow
    ```
 
@@ -34,7 +34,7 @@ Echodataflow streamlines echosounder data processing by combining [Prefect](http
    clone the repo and install it like below:
    ```bash
    git clone https://github.com/echostack-org/echodataflow.git  # clone the repo
-   pip install -e ".[test,lint,docs]"  # install in editable mode with dev tools
+   pip install -e ".[test,lint,docs,mission]"  # install in editable mode with dev tools
    ```
 
 3. Pip install the `segmentation_inference` package that contains a version of the hake segmentation model.
