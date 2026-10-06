@@ -39,5 +39,5 @@ jobs:
       - name: Run tests
         run: |
           python -m pytest -vv \
-            --ignore=tests/test_operations_predict_hake.py \
-            --ignore=tests/test_postprocessing_flow_validation.py
+            --ignore=tests/operations/test_operations_predict_hake.py \
+            --ignore=tests/flow/test_postprocessing_flow_validation.py
