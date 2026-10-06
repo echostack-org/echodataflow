@@ -10,7 +10,6 @@ parts:
         sections:
         - file: configuration/datastore.md
         - file: configuration/pipeline.md
-      - file: gettingstarteddocker       
   - caption: Demo
     chapters:
       - file: local/intro
@@ -34,7 +33,6 @@ parts:
         sections:
           - file: logging/daskstream.md
           - file: logging/awscloud
-          - file: logging/kelk
   - caption: Command-Line Interface
     chapters:
       - file: cli/intro
