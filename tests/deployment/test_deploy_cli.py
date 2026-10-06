@@ -2,6 +2,9 @@ import importlib.util
 import sys
 from pathlib import Path
 
+import pytest
+
+
 def import_module_from_path(module_name, file_path):
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
@@ -12,7 +15,13 @@ def import_module_from_path(module_name, file_path):
 
 def _load_deploy_cli_module(install_prefect_stubs):
     install_prefect_stubs()
-    module_path = Path(__file__).resolve().parents[2] / "src" / "echodataflow" / "deployment" / "deploy_cli.py"
+    module_path = (
+        Path(__file__).resolve().parents[2]
+        / "src"
+        / "echodataflow"
+        / "deployment"
+        / "deploy_cli.py"
+    )
     return import_module_from_path("deploy_cli_test_mod", module_path)
 
 
@@ -35,6 +44,46 @@ def test_build_parser_run(install_prefect_stubs):
     assert args.target == "run"
     assert args.param_config == Path("config_ship.yaml")
     assert args.deploy_spec == Path("deploy_ship.yaml")
+
+
+@pytest.mark.parametrize(
+    ("flow_start_time", "expected_output"),
+    [
+        (
+            "2025-06-19T00:30:00+00:00",
+            "Time travel mode: flow start time is 2025-06-19T00:30:00+00:00\n",
+        ),
+        (None, ""),
+    ],
+)
+def test_run_from_specs_prints_time_travel_mode_only_when_configured(
+    monkeypatch,
+    install_prefect_stubs,
+    capsys,
+    flow_start_time,
+    expected_output,
+):
+    module = _load_deploy_cli_module(install_prefect_stubs=install_prefect_stubs)
+    param_path = Path("params.yaml")
+    deploy_path = Path("deploy.yaml")
+    configs = {
+        param_path: {"flows": {}},
+        deploy_path: {"flows": {}, "flow_start_time": flow_start_time},
+    }
+
+    monkeypatch.setattr(module, "load_config", configs.__getitem__)
+    monkeypatch.setattr(module, "resolve_registered_flows", lambda _config: {})
+    monkeypatch.setattr(module, "resolve_deployment_source", lambda **_kwargs: "source")
+    monkeypatch.setattr(module, "build_deploy_specs", lambda **_kwargs: [])
+    monkeypatch.setattr(module, "configure_concurrency_groups", lambda **_kwargs: None)
+    monkeypatch.setattr(module, "create_deployments", lambda **_kwargs: ([], []))
+
+    module._run_from_specs(
+        param_cfg_path=param_path,
+        deploy_cfg_path=deploy_path,
+    )
+
+    assert capsys.readouterr().out == expected_output
 
 
 def test_main_dispatches_run_args(monkeypatch, install_prefect_stubs):

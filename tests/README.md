@@ -4,7 +4,12 @@ This repository keeps tests in a top-level `tests/` directory so test code is se
 
 ## Structure
 
-- `tests/rewrite/`: tests for deployment and rewrite orchestration logic
+- `tests/flow/`: tests for `echodataflow.flows`
+- `tests/operations/`: tests for `echodataflow.operations`
+- `tests/utils/`: tests for `echodataflow.utils`
+- `tests/deployment/`: tests for `echodataflow.deployment`
+- `tests/tasks/`: tests for `echodataflow.tasks`
+- `tests/services/`: reserved for tests for `echodataflow.services`
 
 ## Conventions
 
@@ -20,14 +25,14 @@ Run all configured tests:
 python -m pytest
 ```
 
-Run rewrite tests only:
+Run deployment tests only (substitute any folder above to select another group):
 
 ```bash
-python -m pytest tests/rewrite
+python -m pytest tests/deployment
 ```
 
 If your environment does not include optional pytest plugins configured in `pyproject.toml`, you can temporarily override addopts:
 
 ```bash
-python -m pytest -o addopts='' tests/rewrite
+python -m pytest -o addopts='' tests/deployment
 ```

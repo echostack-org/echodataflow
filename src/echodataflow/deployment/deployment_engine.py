@@ -3,118 +3,104 @@
 from __future__ import annotations
 
 import datetime
+import importlib.util
 import inspect
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
-import importlib.util
 
 from prefect.deployments.runner import RunnerDeployment
 from prefect.events import DeploymentEventTrigger
 from prefect.flows import Flow
-from prefect.variables import Variable
 from yaml import safe_load
 
 from echodataflow.deployment.core import (
+    ALLOWED_CONCURRENCY_GROUP_KEYS,
+    ALLOWED_DASK_CLUSTER_KEYS,
     ALLOWED_DEPLOY_KEYS,
+    ALLOWED_DEPLOYMENT_CONCURRENCY_KEYS,
     ALLOWED_FLOW_DEPLOY_KEYS,
     ALLOWED_GIT_SOURCE_KEYS,
     ALLOWED_SOURCE_KEYS,
+    ALLOWED_TASK_RUNNER_KEYS,
     ALLOWED_TRIGGER_KEYS,
     DEFAULT_ENTRYPOINT_ROOT,
+    TASK_RUNNER_ENV_VAR,
 )
 
 
 @dataclass(frozen=True)
 class DeploymentSpec:
-    flow_key: str  # the flow key from deploy config, used to look up flow params and deploy settings
+    flow_key: (
+        str  # the flow key from deploy config, used to look up flow params and deploy settings
+    )
     deployment_name: str  # the deployment name to use for this flow
-    flow_obj: Flow[..., Any]  # the actual Flow object resolved from discovered flow metadata
+    flow_obj: Flow[..., Any]  # the actual Flow object resolved from the registry
     entrypoint: str  # source-relative entrypoint for the actual deployed flow
     parameters: dict[str, Any]  # parameters passed directly to the deployed flow
+    concurrency_group: str | None = None
+    deployment_concurrency: dict[str, Any] | None = None
+    task_runner: dict[str, Any] | None = None
     cron: str | None = None  # precomputed cron schedule, when interval mode is used
-    work_pool_name: str | None = None  # the work pool name to use for this deployment, if different from default
+    work_pool_name: str | None = (
+        None  # the work pool name to use for this deployment, if different from default
+    )
     triggers: list[Any] | None = None  # precomputed Prefect trigger objects
 
 
-def discover_all_flows() -> dict[str, dict[str, Any]]:
-    """
-    Discover all flow_* functions from all modules in echodataflow.flows folder.
-    Returns mapping: flow_name -> {"flow_obj", "flow_module", "flow_function_name"}
-    """
-
-    flows_pkg_spec = importlib.util.find_spec("echodataflow.flows") # this points to __init__.py
-    if flows_pkg_spec is None or flows_pkg_spec.origin is None:
-        raise ValueError("Could not locate echodataflow.flows package")
-    
-    flows_dir = Path(flows_pkg_spec.origin).parent  # this points to src/echodataflow/flows
-    discovered: dict[str, dict[str, Any]] = {}
-    
-    # Find all .py files in flows directory (excluding __init__.py)
-    for py_file in flows_dir.glob("*.py"):
-        if py_file.name.startswith("_"):
-            continue
-        
-        module_name = py_file.stem  # filename without .py
-        try:
-            flow_module_obj = importlib.import_module(f"echodataflow.flows.{module_name}")
-        except ImportError as e:
-            raise ImportError(f"Failed to import echodataflow.flows.{module_name}: {e}")
-        
-        # Find all flow_* attributes in the module
-        for flow_function_name in dir(flow_module_obj):
-            if not flow_function_name.startswith("flow_"):
-                continue
-
-            flow_name = flow_function_name.removeprefix("flow_")
-            flow_obj = cast(Flow[..., Any], getattr(flow_module_obj, flow_function_name))
-            
-            discovered[flow_name] = {
-                "flow_module": module_name,  # the module name as string
-                "flow_function_name": flow_function_name,  # flow function name including flow_ prefix
-                "flow_obj": flow_obj,  # the actual Flow object
-            }
-    
-    return discovered
-
-
-def filter_flows_for_deploy(
-    all_flows: dict[str, dict[str, Any]],
-    deploy_cfg: dict[str, Any]
+def resolve_registered_flows(
+    deploy_cfg: dict[str, Any],
 ) -> dict[str, dict[str, Any]]:
-    """
-    Filter discovered flows to only those specified in deploy config.
-    Build a flow-name mapping keyed by `flow_<name>` from discovered flows,
-    then resolve deploy entries by `flow_<key>` or `flow_<alias>`.
-    Returns mapping keyed by deploy flow_<key> to discovered flow info.
-    """
-    filtered: dict[str, dict[str, Any]] = {}
-    flow_name_map = {f"flow_{name}": flow_info for name, flow_info in all_flows.items()}
-    
-    for key, deploy_meta in deploy_cfg.get("flows", {}).items():
-        requested_name = f"flow_{key}"  # flow function name: 
-                                             # either flow_<key> or flow_<alias>
-        alias_name: str | None = None
-        if isinstance(deploy_meta, dict):
-            alias = deploy_meta.get("flow_alias")
-            if isinstance(alias, str) and alias:
-                alias_name = f"flow_{alias}"
+    """Validate and load only the registry flows requested by a deploy recipe."""
+    from echodataflow.deployment.flow_registry import FLOW_REGISTRY
 
-        matched_name = requested_name
-        if matched_name not in flow_name_map and alias_name is not None:
-            matched_name = alias_name
+    resolved: dict[str, dict[str, Any]] = {}
+    for recipe_key, deploy_meta in deploy_cfg.get("flows", {}).items():
+        if not isinstance(deploy_meta, dict):
+            raise ValueError(f"deploy_cfg.flows.{recipe_key} must be a mapping")
 
-        if matched_name not in flow_name_map:
-            available = ", ".join(sorted(flow_name_map)) or "<none>"
+        registry_key = deploy_meta.get("flow", recipe_key)
+        if not isinstance(registry_key, str) or not registry_key.strip():
+            raise ValueError(f"deploy_cfg.flows.{recipe_key}.flow must be a non-empty string")
+        registry_key = registry_key.strip()
+
+        try:
+            registration = FLOW_REGISTRY[registry_key]
+        except KeyError as e:
+            available = ", ".join(sorted(FLOW_REGISTRY)) or "<none>"
             raise KeyError(
-                f"Flow '{key}' not found in discovered flows "
-                f"(checked {requested_name!r}"
-                f"{f' and {alias_name!r}' if alias_name else ''}). "
-                f"Available flows: {available}"
+                f"Flow {registry_key!r}, requested by recipe entry {recipe_key!r}, "
+                f"is not registered. Available flows: {available}"
+            ) from e
+
+        entrypoint_path, separator, function_name = registration.entrypoint.partition(":")
+        if not separator or not entrypoint_path.endswith(".py") or not function_name:
+            raise ValueError(
+                f"Registered flow {registry_key!r} has invalid entrypoint "
+                f"{registration.entrypoint!r}; expected 'package/module.py:function'"
             )
-        filtered[key] = flow_name_map[matched_name]
-    
-    return filtered
+        module_name = entrypoint_path.removesuffix(".py").replace("/", ".")
+
+        try:
+            flow_module_obj = importlib.import_module(module_name)
+        except ImportError as e:
+            raise ImportError(f"Failed to import registered flow module {module_name}: {e}") from e
+
+        try:
+            flow_obj = cast(Flow[..., Any], getattr(flow_module_obj, function_name))
+        except AttributeError as e:
+            raise AttributeError(
+                f"Registered flow {registry_key!r} points to missing function "
+                f"{function_name!r} in {module_name}"
+            ) from e
+
+        resolved[recipe_key] = {
+            "flow_obj": flow_obj,
+            "entrypoint": registration.entrypoint,
+        }
+
+    return resolved
 
 
 def load_config(config_path: Path) -> dict[str, Any]:
@@ -144,7 +130,7 @@ def _infer_local_source_root() -> Path:
 
 def _validate_local_source_layout(local_source_root: Path) -> Path:
     """
-    Validate the local source root and entrypoint exists 
+    Validate the local source root and entrypoint exists
     and return the root to use for local deployments.
     """
     root = local_source_root.resolve()
@@ -228,10 +214,9 @@ def _compute_time_offset_seconds(flow_start_time: str | None) -> float:
     if flow_start_time is None:
         return 0.0
 
-    curr_time_offset = (
-        datetime.datetime.now(datetime.timezone.utc)
-        - datetime.datetime.fromisoformat(flow_start_time).astimezone(datetime.timezone.utc)
-    )
+    curr_time_offset = datetime.datetime.now(
+        datetime.timezone.utc
+    ) - datetime.datetime.fromisoformat(flow_start_time).astimezone(datetime.timezone.utc)
     return curr_time_offset.total_seconds()
 
 
@@ -243,18 +228,31 @@ def build_cron(interval: int | None, cron_offset: int = 0) -> str | None:
     return f"*/{interval} * * * *"
 
 
-def build_triggers(trigger_items: list[dict[str, Any]]) -> list[Any]:
-    return [
-        DeploymentEventTrigger(
-            expect={item["expect"]},
-            match_related={
+def build_triggers(
+    trigger_items: list[dict[str, Any]],
+) -> list[Any]:
+    triggers = []
+
+    for item in trigger_items:
+        kwargs = {
+            "expect": {item["expect"]},
+        }
+
+        if item["resource_scope"] == "primary":
+            kwargs["match"] = {
+                "prefect.resource.name": item["resource_name"],
+            }
+        else:
+            kwargs["match_related"] = {
                 "prefect.resource.name": item["resource_name"],
                 "prefect.resource.role": "deployment",
-            },
-        )
-        for item in trigger_items
-    ]
+            }
 
+        triggers.append(
+            DeploymentEventTrigger(**kwargs)
+        )
+
+    return triggers
 
 def _reject_unknown_keys(
     value: dict[str, Any],
@@ -265,6 +263,66 @@ def _reject_unknown_keys(
     unknown = sorted(set(value) - allowed)
     if unknown:
         raise ValueError(f"Unsupported field(s) at {path}: {unknown}")
+
+
+def _validate_positive_integer(value: Any, *, path: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"{path} must be a positive integer")
+
+
+def validate_task_runner_config(value: Any, *, path: str) -> None:
+    """Validate the supported YAML representation of a task runner."""
+    if not isinstance(value, dict):
+        raise ValueError(f"{path} must be a mapping")
+    _reject_unknown_keys(value, allowed=ALLOWED_TASK_RUNNER_KEYS, path=path)
+    if value.get("type") != "dask":
+        raise ValueError(f"{path}.type must be 'dask'")
+
+    cluster_kwargs = value.get("cluster_kwargs", {})
+    cluster_path = f"{path}.cluster_kwargs"
+    if not isinstance(cluster_kwargs, dict):
+        raise ValueError(f"{cluster_path} must be a mapping")
+    _reject_unknown_keys(
+        cluster_kwargs,
+        allowed=ALLOWED_DASK_CLUSTER_KEYS,
+        path=cluster_path,
+    )
+    for key in ("n_workers", "threads_per_worker"):
+        if key in cluster_kwargs:
+            _validate_positive_integer(cluster_kwargs[key], path=f"{cluster_path}.{key}")
+    if "processes" in cluster_kwargs and not isinstance(cluster_kwargs["processes"], bool):
+        raise ValueError(f"{cluster_path}.processes must be a boolean")
+
+
+def validate_deployment_concurrency_config(value: Any, *, path: str) -> None:
+    """Validate deployment-scoped flow-run concurrency settings."""
+    if not isinstance(value, dict):
+        raise ValueError(f"{path} must be a mapping")
+    _reject_unknown_keys(
+        value,
+        allowed=ALLOWED_DEPLOYMENT_CONCURRENCY_KEYS,
+        path=path,
+    )
+    if "limit" not in value:
+        raise ValueError(f"{path}.limit is required")
+    _validate_positive_integer(value["limit"], path=f"{path}.limit")
+
+    collision_strategy = value.get("collision_strategy", "ENQUEUE")
+    if collision_strategy not in {"ENQUEUE", "CANCEL_NEW"}:
+        raise ValueError(
+            f"{path}.collision_strategy must be 'ENQUEUE' or 'CANCEL_NEW'"
+        )
+
+    grace_period_seconds = value.get("grace_period_seconds")
+    if grace_period_seconds is not None:
+        _validate_positive_integer(
+            grace_period_seconds,
+            path=f"{path}.grace_period_seconds",
+        )
+        if not 60 <= grace_period_seconds <= 86400:
+            raise ValueError(
+                f"{path}.grace_period_seconds must be between 60 and 86400"
+            )
 
 
 def validate_deploy_config(deploy_cfg: Any) -> None:
@@ -278,6 +336,24 @@ def validate_deploy_config(deploy_cfg: Any) -> None:
     if not isinstance(flows, dict):
         raise ValueError("deploy_cfg.flows must be a mapping")
 
+    concurrency_groups = deploy_cfg.get("concurrency_groups", {})
+    if not isinstance(concurrency_groups, dict):
+        raise ValueError("deploy_cfg.concurrency_groups must be a mapping")
+    for group_name, group_config in concurrency_groups.items():
+        group_path = f"deploy_cfg.concurrency_groups.{group_name}"
+        if not isinstance(group_name, str) or not group_name.strip():
+            raise ValueError("deploy_cfg.concurrency_groups keys must be non-empty strings")
+        if not isinstance(group_config, dict):
+            raise ValueError(f"{group_path} must be a mapping")
+        _reject_unknown_keys(
+            group_config,
+            allowed=ALLOWED_CONCURRENCY_GROUP_KEYS,
+            path=group_path,
+        )
+        if "limit" not in group_config:
+            raise ValueError(f"{group_path}.limit is required")
+        _validate_positive_integer(group_config["limit"], path=f"{group_path}.limit")
+
     for flow_key, deploy_meta in flows.items():
         flow_path = f"deploy_cfg.flows.{flow_key}"
         if not isinstance(deploy_meta, dict):
@@ -287,6 +363,33 @@ def validate_deploy_config(deploy_cfg: Any) -> None:
             allowed=ALLOWED_FLOW_DEPLOY_KEYS,
             path=flow_path,
         )
+
+        registry_key = deploy_meta.get("flow")
+        if registry_key is not None and (
+            not isinstance(registry_key, str) or not registry_key.strip()
+        ):
+            raise ValueError(f"{flow_path}.flow must be a non-empty string")
+
+        concurrency_group = deploy_meta.get("concurrency_group")
+        if concurrency_group is not None:
+            if not isinstance(concurrency_group, str) or not concurrency_group.strip():
+                raise ValueError(f"{flow_path}.concurrency_group must be a non-empty string")
+            if concurrency_group not in concurrency_groups:
+                raise ValueError(
+                    f"{flow_path}.concurrency_group references undefined group "
+                    f"{concurrency_group!r}"
+                )
+
+        deployment_concurrency = deploy_meta.get("deployment_concurrency")
+        if deployment_concurrency is not None:
+            validate_deployment_concurrency_config(
+                deployment_concurrency,
+                path=f"{flow_path}.deployment_concurrency",
+            )
+
+        task_runner = deploy_meta.get("task_runner")
+        if task_runner is not None:
+            validate_task_runner_config(task_runner, path=f"{flow_path}.task_runner")
 
         triggers = deploy_meta.get("triggers")
         if isinstance(triggers, list):
@@ -346,36 +449,55 @@ def validate_triggers(
     When configured, triggers must be a non-empty list of mappings with
     non-empty string values for `expect` and `resource_name`.
     """
+
     triggers = validate_optional_non_empty_list(
         triggers,
         field_name=f"deploy_cfg.flows.{flow_key}.triggers",
         item_label="trigger",
     )
+
     if triggers is None:
         return None
 
     validated_triggers: list[dict[str, Any]] = []
+
     for trigger_item in triggers:
         if not isinstance(trigger_item, dict):
-            raise ValueError(
-                f"deploy_cfg.flows.{flow_key}.triggers entries must be mappings"
-            )
+            raise ValueError(f"deploy_cfg.flows.{flow_key}.triggers entries must be mappings")
 
         expect = trigger_item.get("expect")
         resource_name = trigger_item.get("resource_name")
+        resource_scope = trigger_item.get(
+            "resource_scope",
+            "related",
+        )
+
         if not isinstance(expect, str) or not expect.strip():
             raise ValueError(
-                f"deploy_cfg.flows.{flow_key}.triggers entries must define a non-empty 'expect'"
+                f"deploy_cfg.flows.{flow_key}.triggers entries "
+                "must define a non-empty 'expect'"
             )
+
         if not isinstance(resource_name, str) or not resource_name.strip():
             raise ValueError(
-                f"deploy_cfg.flows.{flow_key}.triggers entries must define a non-empty 'resource_name'"
+                f"deploy_cfg.flows.{flow_key}.triggers entries "
+                "must define a non-empty 'resource_name'"
+            )
+
+        if resource_scope not in {
+            "primary",
+            "related",
+        }:
+            raise ValueError(
+                f"deploy_cfg.flows.{flow_key}.triggers "
+                "resource_scope must be 'primary' or 'related'"
             )
 
         validated_triggers.append(
             {
                 "expect": expect.strip(),
                 "resource_name": resource_name.strip(),
+                "resource_scope": resource_scope,
             }
         )
 
@@ -401,19 +523,15 @@ def validate_flow_coverage(
     missing_from_config = deploy_flow_keys - config_flows
     errors: list[str] = []
     if missing_from_deploy:
-        errors.append(
-            f"In config but missing from deploy: {sorted(missing_from_deploy)}"
-        )
+        errors.append(f"In config but missing from deploy: {sorted(missing_from_deploy)}")
     if missing_from_config:
-        errors.append(
-            f"In deploy but missing from config: {sorted(missing_from_config)}"
-        )
+        errors.append(f"In deploy but missing from config: {sorted(missing_from_config)}")
     if errors:
         raise ValueError("Flow coverage mismatch. " + " | ".join(errors))
 
 
-def _flow_accepts_time_offset_seconds(flow_obj: Any) -> bool:
-    """Return True when the flow function can accept `time_offset_seconds`.
+def _flow_accepts_parameter(flow_obj: Any, parameter: str) -> bool:
+    """Return True when the flow function accepts the named parameter.
 
     Prefect Flow objects expose the wrapped function via `.fn`. If a flow object
     does not expose an inspectable function (e.g. certain test doubles), we skip
@@ -424,14 +542,14 @@ def _flow_accepts_time_offset_seconds(flow_obj: Any) -> bool:
         return True
 
     signature = inspect.signature(flow_fn)
-    return "time_offset_seconds" in signature.parameters
+    return parameter in signature.parameters
 
 
 def build_deploy_specs(
     *,
     param_cfg: dict[str, Any],
     deploy_cfg: dict[str, Any],
-    filtered_flows: dict[str, dict[str, Any]],
+    resolved_flows: dict[str, dict[str, Any]],
 ) -> list[DeploymentSpec]:
     """
     Build deployment specs from deploy/param config and pre-filtered flows mapping.
@@ -448,28 +566,22 @@ def build_deploy_specs(
         if not isinstance(deploy_meta, dict):
             continue
 
-        if key not in filtered_flows:
-            continue
-
-        # Scheduling is optional for manually run deployments, but the two
-        # supported scheduling mechanisms are mutually exclusive.
-        if (deploy_meta.get("triggers") is not None) and (
-            deploy_meta.get("interval") is not None
-        ):
-            raise ValueError(
-                f"deploy_cfg.flows.{key} must define only one of 'triggers' or 'interval'"
-            )
-
-        flow_info = filtered_flows[key]
+        flow_info = resolved_flows[key]
 
         # Check if time_offset_seconds is indeed accepted by the flows specified in deploy config
-        if (
-            key in time_offset_targets
-            and not _flow_accepts_time_offset_seconds(flow_info["flow_obj"])
+        if key in time_offset_targets and not _flow_accepts_parameter(
+            flow_info["flow_obj"], "time_offset_seconds"
         ):
             raise ValueError(
                 f"deploy_cfg.flows.{key}.inject_time_offset is enabled, "
                 "but the target flow does not define 'time_offset_seconds'"
+            )
+
+        # Scheduling is optional for manually run deployments, but the two
+        # supported scheduling mechanisms are mutually exclusive.
+        if (deploy_meta.get("triggers") is not None) and (deploy_meta.get("interval") is not None):
+            raise ValueError(
+                f"deploy_cfg.flows.{key} must define only one of 'triggers' or 'interval'"
             )
 
         # Set up triggers or cron schedule based on deploy config
@@ -487,24 +599,21 @@ def build_deploy_specs(
         # Build deployment_parameters
         flow_params = flows_params.get(key)
         if not isinstance(flow_params, dict):
-            raise ValueError(
-                f"param_cfg.flows.{key} must be a mapping of flow parameters"
-            )
+            raise ValueError(f"param_cfg.flows.{key} must be a mapping of flow parameters")
 
         deployment_parameters = dict(flow_params)
         if key in time_offset_targets:
             deployment_parameters["time_offset_seconds"] = time_offset_seconds
-
         specs.append(
             DeploymentSpec(
                 flow_key=key,
                 deployment_name=deploy_meta.get("deployment_name", key),
                 flow_obj=flow_info["flow_obj"],
-                entrypoint=(
-                    f"{DEFAULT_ENTRYPOINT_ROOT}/{flow_info['flow_module']}.py:"
-                    f"{flow_info['flow_function_name']}"
-                ),
+                entrypoint=flow_info["entrypoint"],
                 parameters=deployment_parameters,
+                concurrency_group=deploy_meta.get("concurrency_group"),
+                deployment_concurrency=deploy_meta.get("deployment_concurrency"),
+                task_runner=deploy_meta.get("task_runner"),
                 cron=cron,
                 work_pool_name=deploy_meta.get("work_pool_name"),
                 triggers=compiled_triggers,
@@ -543,12 +652,28 @@ def create_deployments(
         if has_non_default_work_pool:
             deployment_kwargs["work_pool_name"] = spec.work_pool_name
 
-        deployment = (
-            flow_obj.from_source(
-                source=source,
-                entrypoint=spec.entrypoint,
-            ).to_deployment(**deployment_kwargs)
+        if spec.concurrency_group is not None:
+            deployment_kwargs["work_queue_name"] = spec.concurrency_group
+
+        if spec.deployment_concurrency is not None:
+            from prefect.client.schemas.objects import ConcurrencyLimitConfig
+
+            deployment_kwargs["concurrency_limit"] = ConcurrencyLimitConfig(
+                **spec.deployment_concurrency
+            )
+
+        # The worker reloads the flow entrypoint, so runner settings must be
+        # present in its runtime environment instead of only on this Flow object
+        if spec.task_runner is not None:
+            deployment_kwargs["job_variables"] = {
+                "env": {TASK_RUNNER_ENV_VAR: json.dumps(spec.task_runner)}
+            }
+
+        sourced_flow = flow_obj.from_source(
+            source=source,
+            entrypoint=spec.entrypoint,
         )
+        deployment = sourced_flow.to_deployment(**deployment_kwargs)
 
         if has_non_default_work_pool:
             standalone.append(deployment)
@@ -556,3 +681,46 @@ def create_deployments(
             grouped.append(deployment)
 
     return grouped, standalone
+
+
+def configure_concurrency_groups(
+    *,
+    specs: list[DeploymentSpec],
+    concurrency_groups: dict[str, dict[str, Any]],
+    default_work_pool_name: str,
+) -> None:
+    """Create or update shared, concurrency-limited Prefect work queues."""
+    if not concurrency_groups:
+        return
+
+    from prefect.client.orchestration import get_client
+    from prefect.exceptions import ObjectNotFound
+
+    with get_client(sync_client=True) as client:
+        for group_name, group_config in concurrency_groups.items():
+            members = [spec for spec in specs if spec.concurrency_group == group_name]
+            if not members:
+                continue
+
+            work_pools = {spec.work_pool_name or default_work_pool_name for spec in members}
+            if len(work_pools) != 1:
+                raise ValueError(
+                    f"Concurrency group {group_name!r} spans multiple work pools: "
+                    f"{sorted(work_pools)}"
+                )
+            work_pool_name = work_pools.pop()
+            limit = group_config["limit"]
+
+            try:
+                queue = client.read_work_queue_by_name(
+                    group_name,
+                    work_pool_name=work_pool_name,
+                )
+            except ObjectNotFound:
+                client.create_work_queue(
+                    name=group_name,
+                    concurrency_limit=limit,
+                    work_pool_name=work_pool_name,
+                )
+            else:
+                client.update_work_queue(queue.id, concurrency_limit=limit)

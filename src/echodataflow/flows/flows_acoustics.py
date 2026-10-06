@@ -1,86 +1,76 @@
 from __future__ import annotations
 
-import re
-import warnings
-from importlib.resources import files
-from pathlib import Path
-import datetime
 import asyncio
+import datetime
+from pathlib import Path
+import shutil
 
-import numpy as np
 import pandas as pd
-import xarray as xr
-import numpy as np
 
-import echopype as ep
-import echoregions as er
-
-import boto3
-from botocore import UNSIGNED
-from botocore.config import Config
-
-from prefect import flow, task, get_run_logger, get_client
-from prefect_dask import DaskTaskRunner
-from prefect.states import Cancelled, Failed
+from prefect import flow, get_run_logger, get_client
+from prefect.futures import as_completed
+from prefect.states import Failed
 from prefect import runtime
-from prefect.variables import Variable
 
-from echodataflow.flows.flows_helper import deployment_already_running
+from echodataflow.deployment.task_runners import task_runner_from_environment
+from echodataflow.utils.manifests import (
+    MVBS_COLUMNS_POSTPROCESSING,
+    MVBS_COLUMNS_REALTIME,
+    SV_COLUMNS_REALTIME,
+    SV_COLUMNS_POSTPROCESSING,
+    filter_time_range,
+    read_manifest,
+    write_manifest,
+)
+from echodataflow.operations.operations_acoustics import (
+    CreateMVBSResult,
+    CreateMVBSSettings,
+    CreateMVBSWorkItem,
+    RawToSvResult,
+    RawToSvSettings,
+    RawToSvWorkItem,
+)
+from echodataflow.operations.operations_postprocessing import (
+    build_MVBS_ledger,
+    build_Sv_ledger,
+    failure_state,
+    propagate_status,
+    plan_mvbs_slices,
+    plan_Sv_cleanup,
+    read_or_create_ledger,
+)
+
+from echodataflow.tasks.tasks_acoustics import (
+    task_create_MVBS,
+    task_raw2Sv,
+)
 from echodataflow.utils.utils import (
     round_up_mins,
     get_slice_start_end_times,
     extract_datetime_from_filename,
 )
 
-from segmentation_inference.model import binary_hake_model
-from segmentation_inference.utils import get_MVBS_tensor
 
-import torch
-
-# Turn on verbose logging for echopype
-# otherwise all logging will be muted
-ep.utils.log.verbose()
-
-
-# Load binary hake models with weights
-def get_hake_model(model_path: str) -> binary_hake_model:
-    model = binary_hake_model().eval()
-    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu'))["state_dict"])
-    return model
-
-
-@flow(
-    log_prints=True,
-    task_runner=DaskTaskRunner()
-)
+@flow(log_prints=True, task_runner=task_runner_from_environment())
 def flow_raw2Sv(
-    exclude_before: str|None = None,
+    exclude_before: str | None = None,
     exclude_raw_file: list[str] = [],
     parallel: bool = False,
     encode_mode: str = "power",
     waveform_mode: str = "CW",
     depth_offset: float = 9.5,
     sonar_model: str = "EK80",
-    datagram_type: str|None = None,
-    nmea_sentence: str|None = None,
+    datagram_type: str | None = None,
+    nmea_sentence: str | None = None,
     filename_pattern: str = "*.raw",
     path_main: str = "",
     path_raw: str = "",
     file_Sv_csv: str = "Sv_files.csv",
     new_file_num_limit: int = 50,
+    add_depth: bool = True,
+    add_location: bool = True,
+    add_splitbeam_angle: bool = False,
 ):
-
-    # Check if the deployment is already running
-    already_running = asyncio.run(deployment_already_running())
-    if already_running:
-        async def cancel_run():
-            async with get_client() as client:
-                await client.set_flow_run_state(
-                    flow_run_id=runtime.flow_run.id,
-                    state=Cancelled(message="Another instance of this flow is already running")
-                )
-        asyncio.run(cancel_run())
-        return  # exit the flow early
 
     # Assemble paths
     path_Sv_zarr = Path(path_main) / "Sv"
@@ -93,32 +83,29 @@ def flow_raw2Sv(
     path_Sv_zarr = str(path_Sv_zarr)  # convert backto string to pass into task
 
     # Load info dataframe containing raw to Sv correspondence
-    if not file_Sv_csv.exists():
-        df_Sv = pd.DataFrame(
-            columns=["raw_filename", "Sv_filename", "first_ping_time", "last_ping_time"]
-        )
-        df_Sv.to_csv(file_Sv_csv)
-    else:
-        df_Sv = pd.read_csv(
-            file_Sv_csv,
-            index_col=0,
-            date_format="ISO8601",
-            parse_dates=["first_ping_time", "last_ping_time"]
-        )
-        df_Sv.sort_values(
-            by="first_ping_time",
-            inplace=True,
-            ignore_index=True
-        )
+    sv_manifest_exists = file_Sv_csv.exists()
+    df_Sv = read_manifest(
+        file_Sv_csv,
+        SV_COLUMNS_REALTIME,
+        ["first_ping_time", "last_ping_time"],
+    )
+    if not sv_manifest_exists:
+        write_manifest(df_Sv, file_Sv_csv)
+    if not df_Sv.empty:
+        df_Sv.sort_values(by="first_ping_time", inplace=True, ignore_index=True)
 
     # Exclude raw files before exclude_before datetime
     if exclude_before is None:
         raw_files_in_folder = set([filename.name for filename in path_raw.glob(filename_pattern)])
     else:
-        raw_files_in_folder = set([
-            filename.name for filename in path_raw.glob(filename_pattern)
-            if extract_datetime_from_filename(filename.name) >= datetime.datetime.fromisoformat(exclude_before)
-        ])
+        raw_files_in_folder = set(
+            [
+                filename.name
+                for filename in path_raw.glob(filename_pattern)
+                if extract_datetime_from_filename(filename.name)
+                >= pd.to_datetime(exclude_before, utc=True)
+            ]
+        )
 
     if df_Sv.empty:
         raw_files_in_df = set()
@@ -152,52 +139,50 @@ def flow_raw2Sv(
             f"Limiting to first {new_file_num_limit} files."
         )
         new_files = new_files[:new_file_num_limit]
-    print(
-        f"Files to process: \n"
-        + "".join([f"- {nf}\n" for nf in new_files])
-    )
+    print("Files to process: \n" + "".join([f"- {nf}\n" for nf in new_files]))
 
-    # Bundle up task_raw2Sv parameters
-    task_kwargs = dict(
-        path_Sv_zarr=path_Sv_zarr,
+    settings = RawToSvSettings(
+        output_directory=path_Sv_zarr,
         encode_mode=encode_mode,
         waveform_mode=waveform_mode,
         depth_offset=depth_offset,
         sonar_model=sonar_model,
         datagram_type=datagram_type,
         nmea_sentence=nmea_sentence,
+        add_depth=add_depth,
+        add_location=add_location,
+        add_splitbeam_angle=add_splitbeam_angle,
     )
+    errors = []
+    results: list[RawToSvResult] = []
 
     if parallel:
         # Convert raw files to Sv in parallel
         print("Processing raw files in parallel")
         future_all = []
         for nf in new_files:
-            new_processed_raw = task_raw2Sv.with_options(
-                task_run_name=nf, name=nf, retries=3
+            new_processed_raw = task_raw2Sv.with_options(task_run_name=nf, name=nf, retries=3)
+            future = new_processed_raw.submit(
+                RawToSvWorkItem(raw_path=str(path_raw / nf)),
+                settings,
             )
-            future = new_processed_raw.submit(path_raw / nf, **task_kwargs)
             future_all.append(future)
 
-        results = []
-        for nf, ff in zip(new_files, future_all):
-            result = [nf] + list(ff.result())
-            results.append(result)
+        for ff in future_all:
+            task_result = ff.result()
+            results.append(task_result)
 
     else:
         # Convert raw files to Sv sequentially
-        errors = []
         print("Processing raw files sequentially")
-        results = []
         for nf in new_files:
             try:
                 print(f"Converting {nf}")
-                Sv_filename, first_ping_time, last_ping_time = task_raw2Sv.with_options(
-                    task_run_name=nf, name=nf, retries=3
-                )(
-                    raw_path=path_raw / nf, **task_kwargs
+                task_result = task_raw2Sv.with_options(task_run_name=nf, name=nf, retries=3)(
+                    RawToSvWorkItem(raw_path=str(path_raw / nf)),
+                    settings,
                 )
-                results.append([nf, Sv_filename, first_ping_time, last_ping_time])
+                results.append(task_result)
             except Exception as e:
                 errors.append(e)
                 print(f"Error converting {nf}: {e}")
@@ -205,87 +190,39 @@ def flow_raw2Sv(
     # Add new entries to df_Sv
     if len(results) > 0:
         df_new = pd.DataFrame(
-            results,
-            columns=["raw_filename", "Sv_filename", "first_ping_time", "last_ping_time"]
+            [
+                {
+                    "raw_filename": result.filename_raw,
+                    "Sv_filename": result.filename_Sv,
+                    "first_ping_time": result.first_ping_time,
+                    "last_ping_time": result.last_ping_time,
+                }
+                for result in results
+            ]
         )
-        
+        for column in ["first_ping_time", "last_ping_time"]:
+            df_new[column] = pd.to_datetime(df_new[column], utc=True)
+
         # Concatenate with existing df_Sv and save
         df_Sv = pd.concat([df_Sv, df_new], ignore_index=True)
-        df_Sv.sort_values(
-            by=["first_ping_time"],
-            inplace=True,
-            ignore_index=True
-        )
-        df_Sv.to_csv(file_Sv_csv, date_format="%Y-%m-%dT%H:%M:%S.%f")
+        df_Sv.sort_values(by=["first_ping_time"], inplace=True, ignore_index=True)
+        write_manifest(df_Sv, file_Sv_csv)
         print(f"Added {len(new_files)} new entries to tracking CSV")
 
     # Set flow to Failed state if any errors occurred
     if len(errors) > 0:
-        error_msg = f"{len(errors)} errors during raw to Sv conversion out of {len(new_files)} files"
+        error_msg = (
+            f"{len(errors)} errors during raw to Sv conversion out of {len(new_files)} files"
+        )
+
         async def set_failed_state():
             async with get_client() as client:
                 await client.set_flow_run_state(
-                    flow_run_id=runtime.flow_run.id,
-                    state=Failed(message=error_msg)
+                    flow_run_id=runtime.flow_run.id, state=Failed(message=error_msg)
                 )
+
         asyncio.run(set_failed_state())
         raise Exception(error_msg)
-
-
-@task(
-    log_prints=True,
-)
-def task_raw2Sv(
-    raw_path: str,
-    encode_mode: str = "power",
-    waveform_mode: str = "CW",
-    depth_offset: float = 9.5,  # in meters
-    sonar_model: str = "EK80",
-    datagram_type: str|None = None,
-    nmea_sentence: str|None = None,
-    path_Sv_zarr: str = "PATH_TO_STORE_SV_ZARR",
-):
-    """
-    Convert raw sonar data to Sv and save to zarr format.
-    """
-    # Convert raw file, consolidate Sv and save to zarr
-    ed = ep.open_raw(
-        raw_file=raw_path,
-        sonar_model=sonar_model,
-    )
-
-    # Compute Sv and consolidate depth and location
-    ds_Sv = ep.calibrate.compute_Sv(
-        echodata=ed,
-        waveform_mode=waveform_mode,
-        encode_mode=encode_mode,
-    )
-    ds_Sv = ep.consolidate.add_depth(
-        ds=ds_Sv,
-        depth_offset=depth_offset,
-    )
-    ed["Platform"] = ed["Platform"].drop_duplicates("time1")
-    ds_Sv = ep.consolidate.add_location(
-        ds=ds_Sv,
-        echodata=ed,
-        datagram_type=datagram_type,
-        nmea_sentence=nmea_sentence,
-    )
-    
-    # Save to zarr
-    out_path = Path(path_Sv_zarr) / f"{Path(raw_path).stem}_Sv.zarr"
-    ds_Sv.to_zarr(
-        store=out_path,
-        mode="w",
-        consolidated=True,
-        # storage_options=config.output.storage_options_dict,
-    )
-
-    return (
-        out_path.name, 
-        pd.to_datetime(ds_Sv["ping_time"][0].values),
-        pd.to_datetime(ds_Sv["ping_time"][-1].values),
-    )
 
 
 @flow(log_prints=True)
@@ -317,7 +254,9 @@ async def flow_create_MVBS(
     end_time = round_up_mins(
         datetime.datetime.now() - datetime.timedelta(seconds=time_offset_seconds),
         slice_mins=slice_mins,
-    ).astimezone(datetime.timezone.utc)  # convert to UTC
+    ).astimezone(
+        datetime.timezone.utc
+    )  # convert to UTC
 
     logger.info(
         "flow started with parameters:\n"
@@ -340,7 +279,9 @@ async def flow_create_MVBS(
     # Validate zarr store paths
     if not path_Sv_zarr.exists():
         # raise ValueError("Sv zarr store does not exist, check raw2Sv flow!")
-        logger.info("Sv zarr store does not exist, check raw2Sv flow! Creating empty folder for now.")
+        logger.info(
+            "Sv zarr store does not exist, check raw2Sv flow! Creating empty folder for now."
+        )
         path_Sv_zarr.mkdir(parents=True, exist_ok=True)
     if not path_MVBS_zarr.exists():
         path_MVBS_zarr.mkdir(parents=True, exist_ok=True)
@@ -349,49 +290,47 @@ async def flow_create_MVBS(
 
     # Load Sv and MVBS info dataframes
     if not file_Sv_csv.exists():
-        raise ValueError("Sv info csv does not exist, check raw2Sv flow!")
-    df_Sv = pd.read_csv(
+        logger.info("Sv info csv does not exist, check raw2Sv flow!")
+        return
+    df_Sv = read_manifest(
         file_Sv_csv,
-        index_col=0,
-        date_format="ISO8601",
-        parse_dates=["first_ping_time", "last_ping_time"]
+        SV_COLUMNS_REALTIME,
+        ["first_ping_time", "last_ping_time"],
     )
-    # Convert last_ping_time and first_ping_time to UTC
-    if not df_Sv.empty:
-        if df_Sv["last_ping_time"].dt.tz is None:
-            df_Sv["last_ping_time"] = df_Sv["last_ping_time"].dt.tz_localize("UTC")
-        if df_Sv["first_ping_time"].dt.tz is None:
-            df_Sv["first_ping_time"] = df_Sv["first_ping_time"].dt.tz_localize("UTC")
-    else:
+    if df_Sv.empty:
         logger.info(
             "Sv info csv is empty, raw2Sv flow may have just started! "
             "No MVBS can be created, exiting flow."
         )
         return
 
-    if not file_MVBS_csv.exists():
-        df_MVBS = pd.DataFrame(
-            columns=["MVBS_filename", "first_ping_time", "last_ping_time"]
-        )
-        df_MVBS.to_csv(file_MVBS_csv)
-    else:
-        df_MVBS = pd.read_csv(
-            file_MVBS_csv,
-            index_col=0,
-            date_format="ISO8601",
-            parse_dates=["first_ping_time", "last_ping_time"]
-        )
+    mvbs_manifest_exists = file_MVBS_csv.exists()
+    df_MVBS = read_manifest(
+        file_MVBS_csv,
+        MVBS_COLUMNS_REALTIME,
+        ["first_ping_time", "last_ping_time"],
+    )
+    if not mvbs_manifest_exists:
+        write_manifest(df_MVBS, file_MVBS_csv)
+
+    settings = CreateMVBSSettings(
+        sv_directory=path_Sv_zarr,
+        output_directory=path_MVBS_zarr,
+        range_bin=range_bin,
+        ping_time_bin=ping_time_bin,
+    )
 
     # Sequentially create MVBS slices
     errors = []
+    results: list[CreateMVBSResult] = []
     for snum in range(num_slices):
         logger.info(f"Slice {snum+1}: {start_time[snum]} to {end_time[snum]}")
 
         # Get Sv files in the specified time range
         Sv_filenames = sorted(
-        df_Sv[
-                (pd.to_datetime(df_Sv["last_ping_time"]) >= start_time[snum]) &
-                (pd.to_datetime(df_Sv["first_ping_time"]) <= end_time[snum])
+            df_Sv[
+                (pd.to_datetime(df_Sv["last_ping_time"], utc=True) >= start_time[snum])
+                & (pd.to_datetime(df_Sv["first_ping_time"], utc=True) <= end_time[snum])
             ]["Sv_filename"].tolist()
         )
         logger.info(
@@ -407,506 +346,360 @@ async def flow_create_MVBS(
         # Create MVBS for this slice
         try:
             MVBS_filename = f"MVBS_{start_time[snum].strftime("%Y%m%dT%H%M%S")}.zarr"
-            first_ping_time, last_ping_time = task_create_MVBS.with_options(
+            result = task_create_MVBS.with_options(
                 task_run_name=MVBS_filename,
                 name=MVBS_filename,
             )(
-                start_time=start_time[snum],
-                end_time=end_time[snum],
-                range_bin=range_bin,
-                ping_time_bin=ping_time_bin,
-                path_MVBS_zarrr=path_MVBS_zarr,
-                MVBS_filename=MVBS_filename,
-                path_Sv_zarr=path_Sv_zarr,
-                Sv_filenames=Sv_filenames,
+                CreateMVBSWorkItem(
+                    start_time=start_time[snum],
+                    end_time=end_time[snum],
+                    sv_filenames=tuple(Sv_filenames),
+                    mvbs_filename=MVBS_filename,
+                ),
+                settings,
             )
-
-            # Add MVBS slice info to dataframe
-            if MVBS_filename in df_MVBS["MVBS_filename"].values:
-                logger.info(f"MVBS file {MVBS_filename} already exists, updating first and last ping times")
-                idx_to_add = df_MVBS.index[df_MVBS["MVBS_filename"] == MVBS_filename]
-            else:
-                logger.info(f"Adding new MVBS file {MVBS_filename} to tracking dataframe")
-                idx_to_add = len(df_MVBS)
-            df_MVBS.loc[idx_to_add] = [MVBS_filename, first_ping_time, last_ping_time]
+            results.append(result)
         except Exception as e:
             errors.append(e)
             logger.error(f"Error during MVBS creation for slice {snum+1}: {e}")
 
+    # Add MVBS slice info to dataframe
+    for result in results:
+        if not result.has_data:
+            logger.info(f"No ping data found for {result.mvbs_filename}, skipping")
+            continue
+        if result.mvbs_filename in df_MVBS["MVBS_filename"].values:
+            logger.info(
+                f"MVBS file {result.mvbs_filename} already exists, "
+                "updating first and last ping times"
+            )
+            idx_to_add = df_MVBS.index[df_MVBS["MVBS_filename"] == result.mvbs_filename]
+        else:
+            logger.info(f"Adding new MVBS file {result.mvbs_filename} to tracking dataframe")
+            idx_to_add = len(df_MVBS)
+        df_MVBS.loc[idx_to_add] = [
+            result.mvbs_filename,
+            pd.to_datetime(result.first_ping_time, utc=True),
+            pd.to_datetime(result.last_ping_time, utc=True),
+        ]
+
     # Save updated MVBS info dataframe
-    df_MVBS.to_csv(file_MVBS_csv, date_format="%Y-%m-%dT%H:%M:%S")
+    write_manifest(df_MVBS, file_MVBS_csv)
 
     # Set flow to Failed state if any errors occurred
     if len(errors) > 0:
         error_msg = f"{len(errors)} errors during MVBS creation out of {num_slices} slices"
         async with get_client() as client:
             await client.set_flow_run_state(
-                flow_run_id=runtime.flow_run.id,
-                state=Failed(message=error_msg)
+                flow_run_id=runtime.flow_run.id, state=Failed(message=error_msg)
             )
         raise Exception(error_msg)
 
 
-@task(log_prints=True)
-def task_create_MVBS(
-    start_time: pd.Timestamp,
-    end_time: pd.Timestamp,
-    range_bin: str,
-    ping_time_bin: str,
-    path_MVBS_zarrr: str,
-    MVBS_filename: str,
-    path_Sv_zarr: str,
-    Sv_filenames: list[str],
-):
-    """
-    Create MVBS from Sv files in the specified time range.
-
-    Parameters
-    ----------
-    MVBS_filename : str
-        The name of the MVBS file to create.
-    start_time : pd.Timestamp
-        The start time for the MVBS slice.
-    end_time : pd.Timestamp
-        The end time for the MVBS slice.
-    """
+@flow(log_prints=True, task_runner=task_runner_from_environment())
+def flow_raw2Sv_postprocessing(
+    path_raw_list: str,
+    path_raw: str,
+    path_main: str,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    exclude_raw_file: list[str] = [],
+    new_file_num_limit: int = -1,
+    task_retries: int = 3,
+    task_retry_delay_seconds: int = 30,
+    max_flow_run_attempts: int = 3,
+    encode_mode: str = "power",
+    waveform_mode: str = "CW",
+    depth_offset: float = 9.5,
+    sonar_model: str = "EK80",
+    datagram_type: str | None = None,
+    nmea_sentence: str | None = None,
+    file_Sv_csv: str = "Sv_files.csv",
+) -> None:
+    """Convert local raw files and update corresponding rows in the Sv ledger."""
     logger = get_run_logger()
+    path_raw = Path(path_raw)
+    if not path_raw.is_dir():
+        raise ValueError(f"Local raw directory does not exist: {path_raw}")
 
-    # Remove timezone info for slicing
-    start_time = start_time.replace(tzinfo=None)
-    end_time = end_time.replace(tzinfo=None)
+    path_Sv = Path(path_main) / "Sv"
+    path_Sv.mkdir(parents=True, exist_ok=True)
+    file_Sv_csv = Path(path_main) / file_Sv_csv
 
-    # Combine Sv files into a single dataset
-    ds_Sv = xr.open_mfdataset(
-        [Path(path_Sv_zarr) / svf for svf in Sv_filenames],
-        parallel=True,
-        coords="minimal",
-        data_vars="minimal",
-        compat='override',
-        chunks={"channel": 1, "ping_time": 1000, "range_sample": -1},
-        engine="zarr",  # use zarr engine for reading
-    ).sel(
-        # slice start/end, end exclusive
-        ping_time=slice(start_time, end_time-pd.to_timedelta("1nanoseconds"))
+    # Initialize the complete ledger before selecting work for this run
+    df_Sv = read_or_create_ledger(
+        ledger_path=file_Sv_csv,
+        columns=SV_COLUMNS_POSTPROCESSING,
+        date_columns=["timestamp", "first_ping_time", "last_ping_time", "Sv_deleted_at"],
+        builder=lambda: build_Sv_ledger(pd.read_csv(path_raw_list)),
+    )
+    selected = filter_time_range(
+        df=df_Sv,
+        column_start_time="timestamp",
+        column_end_time=None,
+        start_time=start_time,
+        end_time=end_time,
     )
 
-    # Compute MVBS for the slice
-    ds_MVBS = ep.commongrid.compute_MVBS(
-        ds_Sv=ds_Sv,
-        range_var="depth",
-        range_bin=range_bin,
-        ping_time_bin=ping_time_bin,
-        reindex=False,
-        fill_value=np.nan,
-    )
+    # Skip files explicitly excluded from conversion
+    if exclude_raw_file:
+        print(f"Exclude {exclude_raw_file} from processing")
+        selected = selected[~selected["raw_filename"].isin(exclude_raw_file)]
 
-    # Save to zarr: 1 chunk along each dimension
-    logger.info(f"Saving MVBS to {MVBS_filename}")
-    ds_MVBS.chunk({"channel": -1, "ping_time": -1, "depth": -1}).to_zarr(
-        store=Path(path_MVBS_zarrr) / MVBS_filename,  # existing file will be overwritten
-        mode="w",
-        consolidated=True,
-        # storage_options=config.output.storage_options_dict,
-    )
-
-    return (
-        pd.to_datetime(ds_MVBS["ping_time"][0].values),
-        pd.to_datetime(ds_MVBS["ping_time"][-1].values),
-    )
-
-
-@flow(log_prints=True)
-async def flow_predict_hake(
-    time_offset_seconds: float = 0.0,
-    slice_mins: int = 10,
-    num_slices: int = 3,
-    temperature: float = 0.5,
-    softmax_threshold: float = 0.5,
-    max_depth: float = 590.0,
-    path_weight: str = "",
-    path_main: str = "",
-    file_MVBS_csv: str = "",
-    file_prediction_csv: str = ""
-):
-    """
-    Predict on MVBS files of specified length.
-
-    Parameters
-    ----------
-    time_offset_seconds : float
-        The time offset in seconds from current time to set the end time for MVBS computation.
-    slice_mins : int
-        Length of each slice in minutes.
-    num_slices : int
-        The number of slices to create.
-    temperature : float
-        Temperature parameter for softmax scaling in prediction.
-    softmax_threshold : float
-        Threshold to determine hake presence.
-    max_depth : float
-        Max depth to predict hake.
-    """
-    logger = get_run_logger()
-
-    # Load binary hake model with weights
-    model = get_hake_model(path_weight)
-
-    # Set end_time to current time - time_offset_seconds
-    end_time = round_up_mins(
-        datetime.datetime.now() - datetime.timedelta(seconds=time_offset_seconds),
-        slice_mins=slice_mins,
-    ).astimezone(datetime.timezone.utc)  # convert to UTC
-
-    logger.info(
-        "flow started with parameters:\n"
-        f"- end_time: {end_time}\n"
-        f"- slice_mins: {slice_mins}\n"
-        f"- num_slices: {num_slices}\n"
-        f"- temperature: {temperature}\n"
-    )
-
-    # Compute slice time range
-    start_time, end_time = get_slice_start_end_times(
-        end_time=end_time, slice_mins=slice_mins, num_slices=num_slices
-    )
-
-    # Assemble paths
-    file_MVBS_csv = Path(path_main) / file_MVBS_csv
-    file_prediction_csv = Path(path_main) / file_prediction_csv
-    path_MVBS_zarr = Path(path_main) / "MVBS"
-    path_prediction_zarr = Path(path_main) / "prediction"
-    path_prediction_evr = Path(path_main) / "EVR"
-    path_NASC_zarr = Path(path_main) / "NASC"
-    if not path_MVBS_zarr.exists():
-        raise ValueError("MVBS zarr store does not exist, check create_MVBS flow!")
-    if not path_prediction_zarr.exists():
-        path_prediction_zarr.mkdir(parents=True, exist_ok=True)
-    if not path_prediction_evr.exists():
-        path_prediction_evr.mkdir(parents=True, exist_ok=True)
-    if not path_NASC_zarr.exists():
-        path_NASC_zarr.mkdir(parents=True, exist_ok=True)
-    # convert back to string to pass into task
-    path_MVBS_zarr = str(path_MVBS_zarr)
-    path_prediction_zarr = str(path_prediction_zarr)
-    path_prediction_evr = str(path_prediction_evr)
-    path_NASC_zarr = str(path_NASC_zarr)
-
-    # Load Sv and MVBS info dataframes
-    if not file_MVBS_csv.exists():
-        raise ValueError("MVBS info csv does not exist, check create_MVBS flow!")
-    df_MVBS = pd.read_csv(
-        file_MVBS_csv,
-        index_col=0,
-        date_format="ISO8601",
-        parse_dates=["first_ping_time", "last_ping_time"]
-    )
-    # Convert last_ping_time and first_ping_time to UTC
-    if not df_MVBS.empty:
-        if df_MVBS["last_ping_time"].dt.tz is None:
-            df_MVBS["last_ping_time"] = df_MVBS["last_ping_time"].dt.tz_localize("UTC")
-        if df_MVBS["first_ping_time"].dt.tz is None:
-            df_MVBS["first_ping_time"] = df_MVBS["first_ping_time"].dt.tz_localize("UTC")
-    else:
-        logger.info(
-            "MVBS info csv is empty, create_MVBS flow may have just started! "
-            "No prediction can be made, exiting flow."
-        )
+    selected = selected[selected["raw2Sv_status"].isin(["pending", "failed"])]
+    if new_file_num_limit != -1:
+        selected = selected.head(new_file_num_limit)
+    if selected.empty:
+        logger.info("No raw files require processing")
         return
 
-    if not file_prediction_csv.exists():
-        df_prediction = pd.DataFrame(
-            columns=[
-                "prediction_filename_postfix",
-                "score_filename",
-                "softmax_filename",
-                "prediction_filename",
-                "evr_filename",
-                "first_ping_time",
-                "last_ping_time"
-            ]
-        )
-        df_prediction.to_csv(file_prediction_csv)
-    else:
-        df_prediction = pd.read_csv(
-            file_prediction_csv,
-            index_col=0,
-            date_format="ISO8601",
-            parse_dates=["first_ping_time", "last_ping_time"]
-        )
-        # Convert last_ping_time and first_ping_time to UTC
-        # only allowable when dataframe is not empty
-        if len(df_prediction) != 0:
-            if df_prediction["last_ping_time"].dt.tz is None:
-                df_prediction["last_ping_time"] = df_prediction["last_ping_time"].dt.tz_localize("UTC")
-            if df_prediction["first_ping_time"].dt.tz is None:
-                df_prediction["first_ping_time"] = df_prediction["first_ping_time"].dt.tz_localize("UTC")
+    # Mark submitted work before workers begin completing out of order
+    df_Sv.loc[selected.index, ["raw2Sv_status", "error"]] = ["pending", ""]
+    write_manifest(df_Sv, file_Sv_csv)
 
-    # Sequentially predict over combined MVBS slices
+    sv_settings = RawToSvSettings(
+        output_directory=str(path_Sv),
+        encode_mode=encode_mode,
+        waveform_mode=waveform_mode,
+        depth_offset=depth_offset,
+        sonar_model=sonar_model,
+        datagram_type=datagram_type,
+        nmea_sentence=nmea_sentence,
+    )
+
+    # Submit one conversion task per local raw file
     errors = []
-    for snum in range(num_slices):
-        logger.info(f"Slice {snum+1}: {start_time[snum]} to {end_time[snum]}")
-
-        # Get MVBS files in the specified time range
-        MVBS_filenames = sorted(
-            df_MVBS[
-                (pd.to_datetime(df_MVBS["last_ping_time"]) >= start_time[snum]) &
-                (pd.to_datetime(df_MVBS["first_ping_time"]) <= end_time[snum])
-            ]["MVBS_filename"].tolist()
+    conversion_futures = {}
+    for row in selected.itertuples(index=False):
+        key = str(row.s3_path)
+        filename = Path(key).name
+        future = task_raw2Sv.with_options(
+            task_run_name=f"raw2Sv_{filename}",
+            retries=task_retries,
+            retry_delay_seconds=task_retry_delay_seconds,
+        ).submit(
+            RawToSvWorkItem(raw_path=str(path_raw / filename)),
+            sv_settings,
         )
-        logger.info(
-            f"Found {len(MVBS_filenames)} MVBS files in the specified time range: \n"
-            + "".join([f"- {mvbsf}\n" for mvbsf in MVBS_filenames])
-        )
+        conversion_futures[future] = key
 
-        # Skip prediction if no MVBS files found
-        if len(MVBS_filenames) == 0:
-            logger.info(f"No MVBS files found for slice {snum+1}, skipping")
-            continue        
-
-        # Predict on the MVBS files and compute NASC
+    # Persist each result immediately so polling MVBS runs can observe progress
+    for future in as_completed(conversion_futures):
+        key = conversion_futures[future]
+        idx = df_Sv.index[df_Sv["s3_path"] == key][0]
         try:
-            predict_filename_postfix=f"{start_time[snum].strftime("%Y%m%dT%H%M%S")}"
-
-            # predict hake on the MVBS files
-            (
-                # used for task_compute_NASC_direct
-                ds_MVBS_combine,
-                da_predict_hake,
-                # used for book keeping
-                score_filename,
-                softmax_filename,
-                prediction_filename,
-                evr_filename,
-                first_ping_time,
-                last_ping_time
-            ) = task_predict_hake.with_options(
-                task_run_name=f"predict_{predict_filename_postfix}",
-                name=f"predict_{predict_filename_postfix}",
-            )(
-                predict_filename_postfix=predict_filename_postfix,
-                MVBS_filenames=MVBS_filenames,
-                start_time=start_time[snum],
-                end_time=end_time[snum],
-                model=model,
-                temperature=temperature,
-                softmax_threshold=softmax_threshold,
-                max_depth=max_depth,
-                path_MVBS_zarr=path_MVBS_zarr,
-                path_prediction_zarr=path_prediction_zarr,
-                path_prediction_evr=path_prediction_evr,
-            )
-
-            # Compute NASC directly from the prediction
-            task_compute_NASC.with_options(
-                task_run_name=f"NASC_{predict_filename_postfix}",
-                name=f"NASC_{predict_filename_postfix}",                
-            )(
-                NASC_filename=f"NASC_{predict_filename_postfix}.zarr",
-                ds_MVBS_combine=ds_MVBS_combine,
-                da_predict_hake=da_predict_hake,
-                path_NASC_zarr=path_NASC_zarr,  # use the same path as predictions
-            )
-
-            # Add prediction slice info to dataframe
-            # Only add if NASC is also computed
-            if predict_filename_postfix in df_prediction["prediction_filename_postfix"].values:
-                logger.info(f"Prediction file {predict_filename_postfix} already exists, updating first and last ping times")
-                idx_to_add = df_prediction.index[df_prediction["prediction_filename_postfix"] == predict_filename_postfix]
-            else:
-                logger.info(f"Adding new prediction file {predict_filename_postfix} to tracking dataframe")
-                idx_to_add = len(df_prediction)
-            df_prediction.loc[idx_to_add] = [
-                predict_filename_postfix,
-                score_filename,
-                softmax_filename,
-                prediction_filename,
-                evr_filename,
-                first_ping_time,
-                last_ping_time,
+            result = future.result()
+            df_Sv.loc[
+                idx,
+                [
+                    "raw_filename",
+                    "Sv_filename",
+                    "raw2Sv_status",
+                    "first_ping_time",
+                    "last_ping_time",
+                    "error",
+                    "Sv_cleanup_status",
+                    "Sv_deleted_at",
+                    "Sv_cleanup_error",
+                ],
+            ] = [
+                result.filename_raw,
+                result.filename_Sv,
+                "completed",
+                pd.to_datetime(result.first_ping_time, utc=True),
+                pd.to_datetime(result.last_ping_time, utc=True),
+                "",
+                "pending",
+                pd.NaT,
+                "",
             ]
-        except Exception as e:
-            errors.append(e)
-            logger.error(f"Error during prediction for slice {snum+1}: {e}")
-        
-        # Save updated prediction info dataframe
-        df_prediction.to_csv(file_prediction_csv, date_format="%Y-%m-%dT%H:%M:%S")
-
-    # Set flow to Failed state if any errors occurred
-    if len(errors) > 0:
-        error_msg = f"{len(errors)} errors during prediction out of {num_slices} slices"
-        async with get_client() as client:
-            await client.set_flow_run_state(
-                flow_run_id=runtime.flow_run.id,
-                state=Failed(message=error_msg)
+            write_manifest(df_Sv, file_Sv_csv)
+            logger.info("Completed %s", key)
+        except Exception as exc:
+            errors.append(exc)
+            attempt_count, status = failure_state(
+                int(df_Sv.loc[idx, "attempt_count"]), max_flow_run_attempts
             )
-        raise Exception(error_msg)  # Stop the flow execution
+            df_Sv.loc[idx, ["raw2Sv_status", "attempt_count", "error"]] = [
+                status,
+                attempt_count,
+                str(exc),
+            ]
+            write_manifest(df_Sv, file_Sv_csv)
+            logger.error("Failed to convert %s: %s", key, exc)
+    if errors:
+        raise RuntimeError(f"{len(errors)} raw-to-Sv conversions failed")
 
 
-@task(log_prints=True)
-def task_predict_hake(
-    predict_filename_postfix: str,
-    MVBS_filenames: list[str],
-    start_time: pd.Timestamp,
-    end_time: pd.Timestamp,
-    model: binary_hake_model,
-    temperature: int = 0.5,
-    softmax_threshold: float = 0.5,
-    max_depth: float = 590.0,
-    path_MVBS_zarr: str = "PATH_TO_MVBS_ZARR",
-    path_prediction_zarr: str = "PATH_TO_PREDICTION_ZARR",
-    path_prediction_evr: str = "PATH_TO_PREDICTION_EVR",
-):
-    """
-    Predict on a single MVBS file.
+@flow(log_prints=True, task_runner=task_runner_from_environment())
+def flow_create_MVBS_postprocessing(
+    path_main: str,
+    slice_mins: int = 20,
+    no_data_gap_hours: float = 3.0,
+    new_file_num_limit: int = -1,
+    max_flow_run_attempts: int = 3,
+    range_bin: str = "1m",
+    ping_time_bin: str = "5s",
+    file_Sv_csv: str = "Sv_files.csv",
+    file_MVBS_csv: str = "MVBS_files.csv",
+    remove_completed_Sv_files: bool = True,
+) -> None:
+    """Create preplanned MVBS slices after all required raw conversions finish."""
 
-    This function combines multiple MVBS files into a single dataset,
-    convert it to the input tensor, and feed it into the model for prediction.
-
-    Parameters
-    ----------
-    predict_filename_postfix : str
-        Postfix for the prediction filename, typically a timestamp.
-    MVBS_filenames : list[str]
-        List of MVBS filenames to process.
-    start_time : pd.Timestamp
-        The start time for the MVBS computation.
-    end_time : pd.Timestamp
-        The end time for the MVBS computation.
-    model : BinaryHakeModel
-        The trained model to use for prediction.
-    temperature : float
-        Temperature parameter for softmax scaling in prediction.
-    softmax_threshold : float
-        Threshold to determine hake presence.
-    max_depth : float
-        Max depth to predict hake.
-    """
     logger = get_run_logger()
-    # Remove timezone info for slicing
-    start_time = start_time.replace(tzinfo=None)
-    end_time = end_time.replace(tzinfo=None)
+    file_Sv_csv = Path(path_main) / file_Sv_csv
+    if not file_Sv_csv.exists():
+        logger.info("Sv ledger does not yet exist")
+        return
 
-    # Combine MVBS files into a single dataset
-    ds_MVBS_combine = xr.open_mfdataset(
-        [Path(path_MVBS_zarr) / mvbsf for mvbsf in MVBS_filenames],
-        parallel=True,
-        coords="minimal",
-        data_vars="minimal",
-        compat='override',
-        chunks={"channel": -1, "ping_time": -1, "depth": -1},  # load everything into 1 chunk
-        engine="zarr",  # use zarr engine for reading
-    ).sel(
-        # slice start/end, end exclusive
-        ping_time=slice(start_time, end_time-pd.to_timedelta("10milliseconds")),
-        depth=slice(None, max_depth)  # slice to what the model expects
+    path_MVBS = Path(path_main) / "MVBS"
+    path_MVBS.mkdir(parents=True, exist_ok=True)
+    file_MVBS_csv = Path(path_main) / file_MVBS_csv
+    # Raw-to-Sv owns Sv ledger initialization
+    df_Sv = read_manifest(
+        path=file_Sv_csv,
+        columns=SV_COLUMNS_POSTPROCESSING,
+        date_columns=["timestamp", "first_ping_time", "last_ping_time", "Sv_deleted_at"],
+    )
+    # Preplan every MVBS row once from the complete raw-file timeline
+    df_MVBS = read_or_create_ledger(
+        ledger_path=file_MVBS_csv,
+        columns=MVBS_COLUMNS_POSTPROCESSING,
+        date_columns=["slice_start", "slice_end", "first_ping_time", "last_ping_time"],
+        builder=lambda: build_MVBS_ledger(
+            ledger_Sv=df_Sv,
+            slice_mins=slice_mins,
+            no_data_gap_hours=no_data_gap_hours,
+        ),
     )
 
-    # Prepare input tensor: slice depth and ensure order of coordinates
-    input_tensor = get_MVBS_tensor(ds_MVBS_combine)
-
-    # Predict using the model
-    output_dict = model.forward(input_tensor, softmax_temperature=temperature)
-    score_tensor = output_dict["interpolated_output"].detach()
-    score_tensor_softmax = output_dict["softmax_output"].detach()
-
-    # Assemble output DataArrays
-    da_score = xr.DataArray(
-        score_tensor,
-        coords={
-            "scatterer_class": ["background", "hake"],
-            "depth": ds_MVBS_combine["depth"],
-            "ping_time": ds_MVBS_combine["ping_time"],
-        },
-        name="score",
+    # Make terminal raw failures explicit in downstream planning
+    updated_MVBS = propagate_status(
+        df_Sv,
+        df_MVBS,
+        upstream_filename_column="raw_filename",
+        upstream_status_column="raw2Sv_status",
+        downstream_filenames_column="raw_filenames",
+        downstream_status_column="MVBS_status",
+        upstream_label="raw files",
     )
-    da_score_softmax = xr.DataArray(
-        score_tensor_softmax,
-        coords={
-            "scatterer_class": ["background", "hake"],
-            "depth": ds_MVBS_combine["depth"],
-            "ping_time": ds_MVBS_combine["ping_time"],
-        },
-        name="softmax_score",
-    )
-    da_predict_hake = (
-        da_score_softmax
-        .sel(scatterer_class="hake")  # only need hake class
-        .transpose("ping_time", "depth")  # TODO: remove once update echopype to 0.10.2
-        .drop_vars("scatterer_class")
-    ) > softmax_threshold
-    da_predict_hake.name = "hake_prediction"
+    if not updated_MVBS.equals(df_MVBS):
+        df_MVBS = updated_MVBS
+        write_manifest(df_MVBS.sort_values("slice_start"), file_MVBS_csv)
 
-    # Save to zarr
-    score_filename = f"score_{predict_filename_postfix}.zarr"
-    softmax_filename = f"softmax_{predict_filename_postfix}.zarr"
-    prediction_filename = f"prediction_{predict_filename_postfix}.zarr"
-    da_score.chunk({"scatterer_class": -1, "ping_time": -1, "depth": -1}).to_zarr(
-        store=Path(path_prediction_zarr) / score_filename,
-        mode="w",
-        consolidated=True,
-    )
-    da_score_softmax.chunk({"scatterer_class": -1, "ping_time": -1, "depth": -1}).to_zarr(
-        store=Path(path_prediction_zarr) / softmax_filename,
-        mode="w",
-        consolidated=True,
-    )
-    da_predict_hake.chunk({"ping_time": -1, "depth": -1}).to_zarr(
-        store=Path(path_prediction_zarr) / prediction_filename,
-        mode="w",
-        consolidated=True,
-    )
+    # Get MVBS slices to be computed based on raw-to-Sv completions
+    planned = plan_mvbs_slices(df_Sv, df_MVBS)
+    if new_file_num_limit != -1:
+        planned = planned[:new_file_num_limit]
+    if not planned:
+        logger.info("No newly ready MVBS slices")
 
-    # Save to evr
-    evr_filename = f"prediction_{predict_filename_postfix}.evr"
-    er.write_evr(
-        Path(path_prediction_evr) / evr_filename,
-        da_predict_hake,
-        region_classification="hake",
-    )
+    futures = {}
+    if planned:
+        settings = CreateMVBSSettings(
+            sv_directory=str(Path(path_main) / "Sv"),
+            output_directory=str(path_MVBS),
+            range_bin=range_bin,
+            ping_time_bin=ping_time_bin,
+        )
+        # Ready slices are independent and can be computed in parallel
+        for item in planned:
+            filename = f"MVBS_{item.start_time:%Y%m%dT%H%M%S}.zarr"
+            future = task_create_MVBS.with_options(task_run_name=filename).submit(
+                CreateMVBSWorkItem(
+                    start_time=item.start_time,
+                    end_time=item.end_time,
+                    sv_filenames=item.filenames,
+                    mvbs_filename=filename,
+                ),
+                settings,
+            )
+            futures[future] = item
 
-    return (
-        ds_MVBS_combine,
-        da_predict_hake,
-        score_filename,
-        softmax_filename,
-        prediction_filename,
-        evr_filename,
-        # Need to enforce UTC as df_prediction for which these values will be
-        # put into is already read in as UTC (if it already exists before this
-        # flow).
-        pd.to_datetime(ds_MVBS_combine["ping_time"][0].values, utc=True),
-        pd.to_datetime(ds_MVBS_combine["ping_time"][-1].values, utc=True),
-    )
+    # Collect task results in memory so this flow remains the sole manifest writer
+    errors = []
+    for future in as_completed(futures):
+        item = futures[future]
+        try:
+            result = future.result()
+            idx = df_MVBS.index[df_MVBS["slice_start"] == item.start_time][0]
+            if not result.has_data:
+                df_MVBS.loc[idx, ["MVBS_status", "error"]] = [
+                    "no_data",
+                    "No ping data in the planned slice",
+                ]
+                logger.info("No ping data found for MVBS slice %s", item.start_time)
+                continue
+            df_MVBS.loc[
+                idx,
+                [
+                    "MVBS_filename",
+                    "first_ping_time",
+                    "last_ping_time",
+                    "is_partial",
+                    "MVBS_status",
+                    "error",
+                ],
+            ] = [
+                result.mvbs_filename,
+                pd.to_datetime(result.first_ping_time, utc=True),
+                pd.to_datetime(result.last_ping_time, utc=True),
+                item.is_partial,
+                "completed",
+                "",
+            ]
+        except Exception as exc:
+            errors.append(exc)
+            filename = f"MVBS_{item.start_time:%Y%m%dT%H%M%S}.zarr"
+            idx = df_MVBS.index[df_MVBS["MVBS_filename"] == filename][0]
+            attempt_count, status = failure_state(
+                int(df_MVBS.loc[idx, "attempt_count"]), max_flow_run_attempts
+            )
+            df_MVBS.loc[idx, ["MVBS_status", "attempt_count", "error"]] = [
+                status,
+                attempt_count,
+                str(exc),
+            ]
+            logger.error("MVBS slice %s failed: %s", item.start_time, exc)
+    write_manifest(df_MVBS.sort_values("slice_start"), file_MVBS_csv)
 
+    if remove_completed_Sv_files:
+        # Remove only Sv inputs whose dependent MVBS slices are all successful
+        path_Sv = (Path(path_main) / "Sv").resolve()
+        df_Sv["Sv_cleanup_error"] = df_Sv["Sv_cleanup_error"].fillna("").astype("string")
+        for Sv_filename in plan_Sv_cleanup(df_Sv, df_MVBS):
+            # Resolve the stable filename back to its single ledger row.
+            matches = df_Sv.index[df_Sv["Sv_filename"] == Sv_filename]
+            if len(matches) != 1:
+                raise ValueError(
+                    f"Expected exactly one Sv ledger row for {Sv_filename}, found {len(matches)}"
+                )
+            idx = matches[0]
+            file_Sv = (path_Sv / Sv_filename).resolve()
+            try:
+                # Guard recursive deletion against absolute, parent, or symlink escapes
+                if file_Sv.parent != path_Sv:
+                    raise ValueError(
+                        f"Sv filename resolves outside the Sv directory: {Sv_filename}"
+                    )
+                if file_Sv.is_dir():
+                    shutil.rmtree(file_Sv)
+                elif file_Sv.is_file():
+                    file_Sv.unlink()
+                else:
+                    raise FileNotFoundError(f"Sv file does not exist: {file_Sv}")
+                df_Sv.loc[idx, "Sv_cleanup_status"] = "deleted"
+                df_Sv.loc[idx, "Sv_deleted_at"] = pd.Timestamp.now(tz="UTC")
+                df_Sv.loc[idx, "Sv_cleanup_error"] = ""
+                logger.info("Removed Sv file %s", file_Sv)
+            except Exception as exc:
+                df_Sv.loc[idx, ["Sv_cleanup_status", "Sv_cleanup_error"]] = [
+                    "failed",
+                    str(exc),
+                ]
+                logger.error("Failed to remove Sv file %s: %s", file_Sv, exc)
+            # Persist each outcome so an interrupted run can safely resume cleanup
+            write_manifest(df_Sv.sort_values("timestamp"), file_Sv_csv)
 
-@task(log_prints=True)
-def task_compute_NASC(
-    NASC_filename: str,
-    ds_MVBS_combine: xr.Dataset,
-    da_predict_hake: xr.DataArray,
-    path_NASC_zarr: str = "PATH_TO_SAVE_NASC_ZARR",
-):
-    logger = get_run_logger()
-
-    # Apply mask based on threshold
-    ds_MVBS_combine_masked = ep.mask.apply_mask(
-        source_ds=ds_MVBS_combine,
-        mask=da_predict_hake,
-        var_name="Sv",
-        fill_value=np.nan,
-    )
-
-    # Compute NASC from MVBS and hake prediction
-    ds_NASC = ep.commongrid.compute_NASC(
-        ds_Sv=ds_MVBS_combine_masked,
-        range_bin="10m",
-        dist_bin="0.5nmi"
-    )
-
-    # Save to zarr
-    logger.info(f"Saving NASC to zarr: {NASC_filename}")
-    ds_NASC.to_zarr(
-        store=Path(path_NASC_zarr) / NASC_filename,
-        mode="w",
-        consolidated=True,
-    )
+    if errors:
+        raise RuntimeError(f"{len(errors)} MVBS slices failed")

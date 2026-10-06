@@ -1,5 +1,6 @@
 import sys
 import types
+from enum import Enum
 
 import pytest
 
@@ -23,10 +24,20 @@ class FakeRunnerDeployment:
     pass
 
 
+class FakeConcurrencyLimitConfig:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
 class FakePrefectFlowGeneric:
     @classmethod
     def __class_getitem__(cls, _item):
         return cls
+
+
+class FakeConcurrencyLimitStrategy(str, Enum):
+    ENQUEUE = "ENQUEUE"
+    CANCEL_NEW = "CANCEL_NEW"
 
 
 @pytest.fixture
@@ -36,6 +47,7 @@ def install_prefect_stubs(monkeypatch):
         if sink is None:
             prefect_mod.deploy = lambda *args, **kwargs: None
         else:
+
             def fake_deploy(*deployments, **kwargs):
                 sink["deploy_call"] = {
                     "deployments": list(deployments),
@@ -57,17 +69,26 @@ def install_prefect_stubs(monkeypatch):
         events_mod = types.ModuleType("prefect.events")
         events_mod.DeploymentEventTrigger = FakeTrigger
 
+        client_mod = types.ModuleType("prefect.client")
+        schemas_mod = types.ModuleType("prefect.client.schemas")
+        objects_mod = types.ModuleType("prefect.client.schemas.objects")
+        objects_mod.ConcurrencyLimitConfig = FakeConcurrencyLimitConfig
+
         monkeypatch.setitem(sys.modules, "prefect", prefect_mod)
         monkeypatch.setitem(sys.modules, "prefect.deployments", deployments_mod)
         monkeypatch.setitem(sys.modules, "prefect.deployments.runner", runner_mod)
         monkeypatch.setitem(sys.modules, "prefect.flows", flows_mod)
         monkeypatch.setitem(sys.modules, "prefect.variables", variables_mod)
         monkeypatch.setitem(sys.modules, "prefect.events", events_mod)
+        monkeypatch.setitem(sys.modules, "prefect.client", client_mod)
+        monkeypatch.setitem(sys.modules, "prefect.client.schemas", schemas_mod)
+        monkeypatch.setitem(sys.modules, "prefect.client.schemas.objects", objects_mod)
 
         return {
             "FakeVariable": FakeVariable,
             "FakeTrigger": FakeTrigger,
             "FakeRunnerDeployment": FakeRunnerDeployment,
+            "FakeConcurrencyLimitConfig": FakeConcurrencyLimitConfig,
             "FakePrefectFlowGeneric": FakePrefectFlowGeneric,
         }
 

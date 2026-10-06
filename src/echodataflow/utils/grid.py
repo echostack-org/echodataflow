@@ -1,5 +1,4 @@
 import cartopy.feature as cfeature
-from cartopy.mpl.ticker import LongitudeFormatter, LatitudeFormatter
 from geopy.distance import distance
 import pandas as pd
 import numpy as np
@@ -136,7 +135,7 @@ def create_grid_cells(boundary_gdf_utm: gpd.GeoDataFrame, x_step: float, y_step:
             # Step forward
             x_coord.append(x_ct)
             y_coord.append(y_ct)
-            x1 = x0 - x_step
+            x1 = x0 + x_step
             y1 = y0 + y_step
             # Append to list
             grid_cells.append(sg.box(x0, y0, x1, y1))
@@ -170,7 +169,6 @@ def get_coastline(boundary_gdf, resolution='10m', projection="epsg:4326"):
     xmin0, ymin0, xmax0, ymax0 = boundary_gdf.total_bounds
 
     # Create boundary boxes
-    boundary_box = sg.box(xmin0 - 5, ymin0 - 5, xmax0 + 5, ymax0 + 5)
     boundary_box_unbuffered = sg.box(xmin0, ymin0, xmax0, ymax0)
     boundary_box_unbuffered_gdf = gpd.GeoDataFrame(
         geometry=[boundary_box_unbuffered], crs=projection

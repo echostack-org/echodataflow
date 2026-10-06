@@ -1,6 +1,4 @@
 import importlib
-import types
-from pathlib import Path
 
 import pytest
 
@@ -26,61 +24,6 @@ def test_validate_flow_coverage(install_prefect_stubs):
         engine.validate_flow_coverage(param_cfg, deploy_cfg_extra)
 
 
-def test_filter_flows_for_deploy_uses_flow_alias_fallback(install_prefect_stubs):
-    install_prefect_stubs()
-    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
-
-    all_flows = {
-        "copy_raw": {
-            "flow_obj": object(),
-            "flow_module": "flows_helper",
-            "flow_function_name": "flow_copy_raw",
-        },
-        "file_upload": {
-            "flow_obj": object(),
-            "flow_module": "flows_helper",
-            "flow_function_name": "flow_file_upload",
-        },
-    }
-    deploy_cfg = {
-        "flows": {
-            "copy_raw": {},
-            "file_upload_acoustics": {
-                "flow_alias": "file_upload",
-            },
-        }
-    }
-
-    filtered = engine.filter_flows_for_deploy(all_flows, deploy_cfg)
-
-    assert set(filtered) == {"copy_raw", "file_upload_acoustics"}
-    assert filtered["copy_raw"] is all_flows["copy_raw"]
-    assert filtered["file_upload_acoustics"] is all_flows["file_upload"]
-
-
-def test_filter_flows_for_deploy_raises_when_key_and_alias_missing(install_prefect_stubs):
-    install_prefect_stubs()
-    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
-
-    all_flows = {
-        "copy_raw": {
-            "flow_obj": object(),
-            "flow_module": "flows_helper",
-            "flow_function_name": "flow_copy_raw",
-        }
-    }
-    deploy_cfg = {
-        "flows": {
-            "file_upload_acoustics": {
-                "flow_alias": "file_upload",
-            }
-        }
-    }
-
-    with pytest.raises(KeyError, match="file_upload_acoustics"):
-        engine.filter_flows_for_deploy(all_flows, deploy_cfg)
-
-
 def test_local_deploy_specs_generate_current_flow_targets(install_prefect_stubs):
     install_prefect_stubs()
     engine = importlib.import_module("echodataflow.deployment.deployment_engine")
@@ -92,11 +35,11 @@ def test_local_deploy_specs_generate_current_flow_targets(install_prefect_stubs)
             "create_MVBS": {"interval": 1},
             "predict_hake": {"interval": 1},
             "file_upload_acoustics": {
-                "flow_alias": "file_upload",
+                "flow": "file_upload",
                 "interval": 1,
             },
             "file_upload_trawl": {
-                "flow_alias": "file_upload",
+                "flow": "file_upload",
                 "interval": 1,
             },
         }
@@ -115,20 +58,19 @@ def test_local_deploy_specs_generate_current_flow_targets(install_prefect_stubs)
     # Build filtered flows mappings with mock flow objects
     ship_flows = {}
     ship_modules = {
-        "copy_raw": "flows_helper",
+        "copy_raw": "flows_simulation",
         "raw2Sv": "flows_acoustics",
         "create_MVBS": "flows_acoustics",
-        "predict_hake": "flows_acoustics",
+        "predict_hake": "flows_predict_hake",
         "file_upload_acoustics": "flows_helper",
         "file_upload_trawl": "flows_helper",
     }
     for flow_key, flow_meta in deploy_ship["flows"].items():
         module_name = ship_modules[flow_key]
-        flow_alias = flow_meta.get("flow_alias") or flow_key
+        registry_key = flow_meta.get("flow") or flow_key
         ship_flows[flow_key] = {
             "flow_obj": object(),
-            "flow_module": module_name,
-            "flow_function_name": f"flow_{flow_alias}",
+            "entrypoint": (f"echodataflow/flows/{module_name}.py:flow_{registry_key}"),
         }
 
     cloud_flows = {}
@@ -140,32 +82,30 @@ def test_local_deploy_specs_generate_current_flow_targets(install_prefect_stubs)
     }
     for flow_key, flow_meta in deploy_cloud["flows"].items():
         module_name = cloud_modules[flow_key]
-        flow_alias = flow_meta.get("flow_alias") or flow_key
         cloud_flows[flow_key] = {
             "flow_obj": object(),
-            "flow_module": module_name,
-            "flow_function_name": f"flow_{flow_alias}",
+            "entrypoint": f"echodataflow/flows/{module_name}.py:flow_{flow_key}",
         }
 
     ship_specs = engine.build_deploy_specs(
         param_cfg=param_ship,
         deploy_cfg=deploy_ship,
-        filtered_flows=ship_flows,
+        resolved_flows=ship_flows,
     )
     cloud_specs = engine.build_deploy_specs(
         param_cfg=param_cloud,
         deploy_cfg=deploy_cloud,
-        filtered_flows=cloud_flows,
+        resolved_flows=cloud_flows,
     )
 
     ship_targets = {spec.flow_key: spec.entrypoint for spec in ship_specs}
     cloud_targets = {spec.flow_key: spec.entrypoint for spec in cloud_specs}
 
     assert ship_targets == {
-        "copy_raw": "echodataflow/flows/flows_helper.py:flow_copy_raw",
+        "copy_raw": "echodataflow/flows/flows_simulation.py:flow_copy_raw",
         "raw2Sv": "echodataflow/flows/flows_acoustics.py:flow_raw2Sv",
         "create_MVBS": "echodataflow/flows/flows_acoustics.py:flow_create_MVBS",
-        "predict_hake": "echodataflow/flows/flows_acoustics.py:flow_predict_hake",
+        "predict_hake": "echodataflow/flows/flows_predict_hake.py:flow_predict_hake",
         "file_upload_acoustics": "echodataflow/flows/flows_helper.py:flow_file_upload",
         "file_upload_trawl": "echodataflow/flows/flows_helper.py:flow_file_upload",
     }
@@ -182,24 +122,214 @@ def test_build_deploy_specs_passes_target_flow_parameters_directly(install_prefe
     engine = importlib.import_module("echodataflow.deployment.deployment_engine")
 
     specs = engine.build_deploy_specs(
-        param_cfg={"flows": {"emit_event_ABC": {"msg": "hello"}}},
+        param_cfg={"flows": {"raw2Sv": {"path_main": "/data"}}},
         deploy_cfg={
             "flows": {
-                "emit_event_ABC": {
+                "raw2Sv": {
                     "interval": 1,
                 }
             }
         },
-        filtered_flows={
-            "emit_event_ABC": {
+        resolved_flows={
+            "raw2Sv": {
                 "flow_obj": object(),
-                "flow_module": "flows_test",
-                "flow_function_name": "flow_emit_event_ABC",
+                "entrypoint": "echodataflow/flows/flows_acoustics.py:flow_raw2Sv",
             }
         },
     )
 
-    assert specs[0].parameters == {"msg": "hello"}
+    assert specs[0].parameters == {"path_main": "/data"}
+
+
+def test_build_deploy_specs_preserves_runner_and_concurrency_group(install_prefect_stubs):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+    runner_config = {
+        "type": "dask",
+        "cluster_kwargs": {
+            "n_workers": 4,
+            "threads_per_worker": 1,
+            "processes": True,
+        },
+    }
+
+    specs = engine.build_deploy_specs(
+        param_cfg={"flows": {"raw2Sv_postprocessing": {}}},
+        deploy_cfg={
+            "concurrency_groups": {"postprocessing": {"limit": 1}},
+            "flows": {
+                "raw2Sv_postprocessing": {
+                    "concurrency_group": "postprocessing",
+                    "deployment_concurrency": {
+                        "limit": 1,
+                        "collision_strategy": "CANCEL_NEW",
+                    },
+                    "task_runner": runner_config,
+                }
+            },
+        },
+        resolved_flows={
+            "raw2Sv_postprocessing": {
+                "flow_obj": object(),
+                "entrypoint": "echodataflow/flows/flows_acoustics.py:flow_raw2Sv_postprocessing",
+            }
+        },
+    )
+
+    assert specs[0].concurrency_group == "postprocessing"
+    assert specs[0].deployment_concurrency == {
+        "limit": 1,
+        "collision_strategy": "CANCEL_NEW",
+    }
+    assert specs[0].task_runner == runner_config
+
+
+def test_create_deployments_applies_runner_and_shared_queue(
+    install_prefect_stubs,
+):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+    calls = {}
+
+    class SourcedFlow:
+        def to_deployment(self, **kwargs):
+            calls["deployment"] = kwargs
+            return kwargs
+
+    class RegisteredFlow:
+        def from_source(self, **kwargs):
+            calls["source"] = kwargs
+            return SourcedFlow()
+
+    spec = engine.DeploymentSpec(
+        flow_key="raw2Sv_postprocessing",
+        deployment_name="raw2Sv-postprocessing",
+        flow_obj=RegisteredFlow(),
+        entrypoint="echodataflow/flows/flows_acoustics.py:flow_raw2Sv_postprocessing",
+        parameters={},
+        concurrency_group="postprocessing",
+        task_runner={"type": "dask", "cluster_kwargs": {"n_workers": 4}},
+    )
+
+    grouped, standalone = engine.create_deployments(
+        specs=[spec],
+        source="local-source",
+        default_work_pool_name="local",
+    )
+
+    assert calls["deployment"]["work_queue_name"] == "postprocessing"
+    runtime_config = calls["deployment"]["job_variables"]["env"]["ECHODATAFLOW_TASK_RUNNER"]
+    assert runtime_config == ('{"type": "dask", "cluster_kwargs": {"n_workers": 4}}')
+    assert len(grouped) == 1
+    assert standalone == []
+
+
+def test_deployment_concurrency_is_independent_of_concurrency_group(
+    install_prefect_stubs,
+):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+    calls = {}
+
+    class SourcedFlow:
+        def to_deployment(self, **kwargs):
+            calls["deployment"] = kwargs
+            return kwargs
+
+    class RegisteredFlow:
+        def from_source(self, **kwargs):
+            return SourcedFlow()
+
+    deployment_concurrency = {
+        "limit": 1,
+        "collision_strategy": "CANCEL_NEW",
+        "grace_period_seconds": 120,
+    }
+    spec = engine.DeploymentSpec(
+        flow_key="ingest_NASC",
+        deployment_name="ingest-NASC",
+        flow_obj=RegisteredFlow(),
+        entrypoint="echodataflow/flows/flows_integration.py:flow_ingest_NASC",
+        parameters={},
+        deployment_concurrency=deployment_concurrency,
+    )
+
+    engine.create_deployments(
+        specs=[spec],
+        source="local-source",
+        default_work_pool_name="local",
+    )
+
+    assert "work_queue_name" not in calls["deployment"]
+    limit_config = calls["deployment"]["concurrency_limit"]
+    assert limit_config.limit == 1
+    assert limit_config.collision_strategy == "CANCEL_NEW"
+    assert limit_config.grace_period_seconds == 120
+
+
+@pytest.mark.parametrize(
+    ("deployment_concurrency", "expected_message"),
+    [
+        ({}, "limit is required"),
+        ({"limit": 0}, "limit must be a positive integer"),
+        (
+            {"limit": 1, "collision_strategy": "DROP_OLD"},
+            "collision_strategy must be 'ENQUEUE' or 'CANCEL_NEW'",
+        ),
+        (
+            {"limit": 1, "grace_period_seconds": 30},
+            "grace_period_seconds must be between 60 and 86400",
+        ),
+    ],
+)
+def test_validate_deploy_config_rejects_invalid_deployment_concurrency(
+    install_prefect_stubs,
+    deployment_concurrency,
+    expected_message,
+):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+
+    with pytest.raises(ValueError, match=expected_message):
+        engine.validate_deploy_config(
+            {"flows": {"ingest_NASC": {"deployment_concurrency": deployment_concurrency}}}
+        )
+
+
+@pytest.mark.parametrize(
+    ("task_runner", "expected_message"),
+    [
+        ({"type": "unknown"}, "type must be 'dask'"),
+        (
+            {"type": "dask", "cluster_kwargs": {"n_workers": 0}},
+            "n_workers must be a positive integer",
+        ),
+        (
+            {"type": "dask", "cluster_kwargs": {"processes": "yes"}},
+            "processes must be a boolean",
+        ),
+    ],
+)
+def test_validate_deploy_config_rejects_invalid_task_runner(
+    install_prefect_stubs,
+    task_runner,
+    expected_message,
+):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+
+    with pytest.raises(ValueError, match=expected_message):
+        engine.validate_deploy_config({"flows": {"raw2Sv": {"task_runner": task_runner}}})
+
+
+def test_validate_deploy_config_rejects_undefined_concurrency_group(
+    install_prefect_stubs,
+):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+
+    with pytest.raises(ValueError, match="references undefined group 'missing'"):
+        engine.validate_deploy_config({"flows": {"raw2Sv": {"concurrency_group": "missing"}}})
 
 
 def test_validate_deploy_config_accepts_every_allowed_key(install_prefect_stubs):
@@ -208,6 +338,7 @@ def test_validate_deploy_config_accepts_every_allowed_key(install_prefect_stubs)
     engine = importlib.import_module("echodataflow.deployment.deployment_engine")
 
     deploy_cfg = {
+        "concurrency_groups": {"postprocessing": {"limit": 2}},
         "flow_start_time": "2026-01-01T00:00:00+00:00",
         "default_work_pool_name": "default-pool",
         "source": {
@@ -219,12 +350,26 @@ def test_validate_deploy_config_accepts_every_allowed_key(install_prefect_stubs)
         },
         "flows": {
             "scheduled": {
+                "concurrency_group": "postprocessing",
+                "deployment_concurrency": {
+                    "limit": 1,
+                    "collision_strategy": "CANCEL_NEW",
+                    "grace_period_seconds": 120,
+                },
                 "deployment_name": "scheduled-deployment",
-                "flow_alias": "actual_flow_name",
+                "flow": "actual_flow_name",
                 "interval": 10,
                 "cron_offset": 3,
                 "inject_time_offset": True,
                 "work_pool_name": "special-pool",
+                "task_runner": {
+                    "type": "dask",
+                    "cluster_kwargs": {
+                        "n_workers": 4,
+                        "threads_per_worker": 1,
+                        "processes": True,
+                    },
+                },
             },
             "event_driven": {
                 "triggers": [
@@ -240,21 +385,42 @@ def test_validate_deploy_config_accepts_every_allowed_key(install_prefect_stubs)
     engine.validate_deploy_config(deploy_cfg)
 
     assert core.ALLOWED_DEPLOY_KEYS == {
+        "concurrency_groups",
         "flow_start_time",
         "default_work_pool_name",
         "source",
         "flows",
     }
     assert core.ALLOWED_FLOW_DEPLOY_KEYS == {
+        "concurrency_group",
+        "deployment_concurrency",
         "deployment_name",
-        "flow_alias",
+        "flow",
         "interval",
         "cron_offset",
         "triggers",
         "inject_time_offset",
+        "task_runner",
         "work_pool_name",
     }
-    assert core.ALLOWED_TRIGGER_KEYS == {"expect", "resource_name"}
+    assert core.ALLOWED_CONCURRENCY_GROUP_KEYS == {"limit"}
+    assert core.ALLOWED_DEPLOYMENT_CONCURRENCY_KEYS == {
+        "limit",
+        "collision_strategy",
+        "grace_period_seconds",
+    }
+    assert core.ALLOWED_TASK_RUNNER_KEYS == {"type", "cluster_kwargs"}
+    assert core.ALLOWED_DASK_CLUSTER_KEYS == {
+        "memory_limit",
+        "n_workers",
+        "processes",
+        "threads_per_worker",
+    }
+    assert core.ALLOWED_TRIGGER_KEYS == {
+        "expect",
+        "resource_name",
+        "resource_scope",
+    }
     assert core.ALLOWED_SOURCE_KEYS == {"mode", "git"}
     assert core.ALLOWED_GIT_SOURCE_KEYS == {"url", "branch"}
 
@@ -335,6 +501,10 @@ def test_validate_deploy_config_rejects_unknown_nested_fields(
             "deploy_cfg.flows.raw2Sv must be a mapping",
         ),
         (
+            {"flows": {"raw2Sv": {"flow": ""}}},
+            "deploy_cfg.flows.raw2Sv.flow must be a non-empty string",
+        ),
+        (
             {"flows": {}, "source": "local"},
             "deploy_cfg.source must be a mapping",
         ),
@@ -365,17 +535,14 @@ def test_build_deploy_specs_rejects_triggers_and_interval(install_prefect_stubs)
             "ingest_NASC": {
                 "deployment_name": "ingest_NASC",
                 "interval": 5,
-                "triggers": [
-                    {"expect": "nasc.ingested", "resource_name": "ingest_NASC"}
-                ],
+                "triggers": [{"expect": "nasc.ingested", "resource_name": "ingest_NASC"}],
             }
         }
     }
-    filtered_flows = {
+    resolved_flows = {
         "ingest_NASC": {
             "flow_obj": object(),
-            "flow_module": "flows_integration",
-            "flow_function_name": "flow_ingest_NASC",
+            "entrypoint": "echodataflow/flows/flows_integration.py:flow_ingest_NASC",
         }
     }
     param_cfg = {"flows": {"ingest_NASC": {}}}
@@ -384,7 +551,7 @@ def test_build_deploy_specs_rejects_triggers_and_interval(install_prefect_stubs)
         engine.build_deploy_specs(
             param_cfg=param_cfg,
             deploy_cfg=deploy_cfg,
-            filtered_flows=filtered_flows,
+            resolved_flows=resolved_flows,
         )
 
 
@@ -401,11 +568,10 @@ def test_build_deploy_specs_allows_manual_deployment_without_schedule(
             }
         }
     }
-    filtered_flows = {
+    resolved_flows = {
         "ingest_NASC": {
             "flow_obj": object(),
-            "flow_module": "flows_integration",
-            "flow_function_name": "flow_ingest_NASC",
+            "entrypoint": "echodataflow/flows/flows_integration.py:flow_ingest_NASC",
         }
     }
     param_cfg = {"flows": {"ingest_NASC": {}}}
@@ -413,7 +579,7 @@ def test_build_deploy_specs_allows_manual_deployment_without_schedule(
     specs = engine.build_deploy_specs(
         param_cfg=param_cfg,
         deploy_cfg=deploy_cfg,
-        filtered_flows=filtered_flows,
+        resolved_flows=resolved_flows,
     )
 
     assert len(specs) == 1
@@ -433,11 +599,10 @@ def test_build_deploy_specs_rejects_empty_triggers(install_prefect_stubs):
             }
         }
     }
-    filtered_flows = {
+    resolved_flows = {
         "ingest_NASC": {
             "flow_obj": object(),
-            "flow_module": "flows_integration",
-            "flow_function_name": "flow_ingest_NASC",
+            "entrypoint": "echodataflow/flows/flows_integration.py:flow_ingest_NASC",
         }
     }
     param_cfg = {"flows": {"ingest_NASC": {}}}
@@ -446,7 +611,7 @@ def test_build_deploy_specs_rejects_empty_triggers(install_prefect_stubs):
         engine.build_deploy_specs(
             param_cfg=param_cfg,
             deploy_cfg=deploy_cfg,
-            filtered_flows=filtered_flows,
+            resolved_flows=resolved_flows,
         )
 
 
@@ -458,17 +623,14 @@ def test_build_deploy_specs_rejects_trigger_missing_resource_name(install_prefec
         "flows": {
             "ingest_NASC": {
                 "deployment_name": "ingest_NASC",
-                "triggers": [
-                    {"expect": "nasc.ingested"}
-                ],
+                "triggers": [{"expect": "nasc.ingested"}],
             }
         }
     }
-    filtered_flows = {
+    resolved_flows = {
         "ingest_NASC": {
             "flow_obj": object(),
-            "flow_module": "flows_integration",
-            "flow_function_name": "flow_ingest_NASC",
+            "entrypoint": "echodataflow/flows/flows_integration.py:flow_ingest_NASC",
         }
     }
     param_cfg = {"flows": {"ingest_NASC": {}}}
@@ -477,7 +639,60 @@ def test_build_deploy_specs_rejects_trigger_missing_resource_name(install_prefec
         engine.build_deploy_specs(
             param_cfg=param_cfg,
             deploy_cfg=deploy_cfg,
-            filtered_flows=filtered_flows,
+            resolved_flows=resolved_flows,
+        )
+
+
+def test_validate_triggers_defaults_resource_scope_to_related(install_prefect_stubs):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+
+    triggers = engine.validate_triggers(
+        [{"expect": "test.event", "resource_name": "test-resource"}],
+        flow_key="test_flow",
+    )
+
+    assert triggers == [
+        {
+            "expect": "test.event",
+            "resource_name": "test-resource",
+            "resource_scope": "related",
+        }
+    ]
+
+
+def test_validate_triggers_accepts_primary_resource_scope(install_prefect_stubs):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+
+    triggers = engine.validate_triggers(
+        [
+            {
+                "expect": "test.event",
+                "resource_name": "test-resource",
+                "resource_scope": "primary",
+            }
+        ],
+        flow_key="test_flow",
+    )
+
+    assert triggers[0]["resource_scope"] == "primary"
+
+
+def test_validate_triggers_rejects_invalid_resource_scope(install_prefect_stubs):
+    install_prefect_stubs()
+    engine = importlib.import_module("echodataflow.deployment.deployment_engine")
+
+    with pytest.raises(ValueError, match="resource_scope must be 'primary' or 'related'"):
+        engine.validate_triggers(
+            [
+                {
+                    "expect": "test.event",
+                    "resource_name": "test-resource",
+                    "resource_scope": "invalid",
+                }
+            ],
+            flow_key="test_flow",
         )
 
 
@@ -504,11 +719,10 @@ def test_build_deploy_specs_rejects_inject_time_offset_for_incompatible_flow(
         },
     }
     param_cfg = {"flows": {"create_MVBS": {"path_main": "/tmp"}}}
-    filtered_flows = {
+    resolved_flows = {
         "create_MVBS": {
             "flow_obj": _FakeFlow(),
-            "flow_module": "flows_acoustics",
-            "flow_function_name": "flow_create_MVBS",
+            "entrypoint": "echodataflow/flows/flows_acoustics.py:flow_create_MVBS",
         }
     }
 
@@ -516,5 +730,5 @@ def test_build_deploy_specs_rejects_inject_time_offset_for_incompatible_flow(
         engine.build_deploy_specs(
             param_cfg=param_cfg,
             deploy_cfg=deploy_cfg,
-            filtered_flows=filtered_flows,
+            resolved_flows=resolved_flows,
         )

@@ -405,15 +405,15 @@ def plot_track_map(
 
     # Filter points with nonzero NASC and format ping_time
     df_NASC_sel = df_NASC[
-        (df_NASC["NASC"]>0) & (df_NASC["latitude"].isna() == False) & (df_NASC["longitude"].isna() == False)
+        (df_NASC["NASC"] > 0)
+        & (~df_NASC["latitude"].isna())
+        & (~df_NASC["longitude"].isna())
     ]
     df_NASC_sel = df_NASC_sel.dropna(subset=["longitude", "latitude", "NASC"])
     df_NASC_sel['ping_time'] = pd.to_datetime(df_NASC_sel['ping_time'], format='ISO8601', errors='coerce').dt.strftime('%Y-%m-%dT%H:%M:%S')
 
     # Get variable attributes
     var = BIO_VAR_NAME.get(bio_var, "NASC")
-    var_units = BIO_VAR_UNIT.get(var, "NASC")
-    colorbar_label = COLORBAR_LABEL.get(var, "NASC")
     var_clim = BIO_VAR_CLIM.get(var, "NASC")
 
     # Get the base tilemap
