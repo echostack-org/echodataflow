@@ -1,63 +1,32 @@
 # Echodataflow
 
-Echodataflow provides recipe-driven orchestration for fisheries acoustics workflows. It
-combines [Prefect](https://www.prefect.io/), YAML deployment recipes, and processing tools
-such as [Echopype](https://github.com/echostack-org/echopype) to run repeatable workflows on
-edge, local, and cloud infrastructure.
+Echodataflow provides recipe-driven orchestration for echosounder data processing workflows.
+It combines [Prefect](https://www.prefect.io/), YAML deployment recipes, and tools
+such as [Echopype](https://github.com/echostack-org/echopype) to run workflows on different
+computing infrastructures.
 
-Echodataflow `0.1.x` is deprecated. The repository currently contains the architecture being
-prepared for the `0.2` release.
+Echodataflow `v0.1.x` is deprecated. We are currently preparing for the `v0.2.0` release,
+which contains a redesigned architecture and more straightforward mechanisms to add workflow
+components.
 
-## Installation
-
-```shell
-conda create -n echodataflow -c conda-forge python=3.12 uv
-conda activate echodataflow
-uv pip install "git+https://github.com/echostack-org/echodataflow.git"
-```
-
-Install Echopype separately when using the acoustic processing flows:
-
-```shell
-uv pip install echopype
-```
 
 ## Documentation
 
-The documentation covers:
+See the [installation guide](docs/installation.md) for environment setup, package
+installation, development tools, and processing dependencies.
 
-- installation and architecture;
-- parameter and deployment recipes;
-- Prefect server and worker setup on macOS and Linux;
-- workflow deployment and troubleshooting;
-- a reproducible simulated edge example; and
-- development setup and adding operations, tasks, and flows.
-
-Read the published documentation at
-[echodataflow.readthedocs.io](https://echodataflow.readthedocs.io/) or build it locally:
-
-```shell
-uv pip install -e ".[docs]"
-cd docs
-jupyter book start
-```
-
-Mission-specific recipes are maintained in
+Learn more about echodataflow in the documentation at
+[echodataflow.readthedocs.io](https://echodataflow.readthedocs.io/). 
+Check out example recipes hosted on the companion repository
 [echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes).
 
-## Development
 
-```shell
-git clone https://github.com/echostack-org/echodataflow.git
-cd echodataflow
-conda create -n echodataflow-dev -c conda-forge python=3.12 uv
-conda activate echodataflow-dev
-uv pip install -e ".[test,lint,docs]"
-pytest
-```
+## Contributing
 
-See the development guide in the documentation for project structure and contribution
-instructions.
+Follow the [editable installation instructions](docs/installation.md#install-for-development),
+then see the [development guide](docs/development.md) for testing, project structure,
+and contribution instructions.
+
 
 ## License
 

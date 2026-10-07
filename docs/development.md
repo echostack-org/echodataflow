@@ -1,8 +1,8 @@
 # Development
 
 Echodataflow uses a `src` layout, Prefect for orchestration, Pytest for tests, and Numpydoc
-docstrings. Use Conda to provide the base Python environment and `uv` for fast installation
-of the editable package and Python dependencies.
+docstrings. Follow [Installation](installation.md#install-for-development) to set up a
+Conda environment and install the editable package with development and mission tools.
 
 ## Create the environment
 
@@ -14,20 +14,8 @@ cd echodataflow
 git remote add upstream https://github.com/echostack-org/echodataflow.git
 ```
 
-Create and activate an isolated environment:
-
-```shell
-conda create -n echodataflow-dev -c conda-forge python=3.12 uv
-conda activate echodataflow-dev
-uv pip install -e ".[test,lint,docs]"
-```
-
-Install optional processing packages needed by the area you are changing. Acoustic flow
-development normally requires Echopype:
-
-```shell
-uv pip install echopype
-```
+Use the environment and editable installation commands in the
+[installation guide](installation.md), applying them to your fork's checkout.
 
 Install the pre-commit hooks:
 
@@ -48,7 +36,7 @@ During development, select a focused module first:
 
 ```shell
 pytest tests/deployment/test_deploy_engine.py
-pytest tests/test_operations_raw_to_Sv.py
+pytest tests/operations/test_operations_raw_to_Sv.py
 ```
 
 Tests should not require a live Prefect server unless they explicitly exercise integration

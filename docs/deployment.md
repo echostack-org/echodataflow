@@ -219,4 +219,3 @@ sqlite3 ~/.prefect/prefect.db "PRAGMA integrity_check;"
 Archive the database rather than deleting it if a reset is required. A locked database is
 not necessarily corrupt; it may indicate multiple server processes or excessive concurrent
 writes.
-

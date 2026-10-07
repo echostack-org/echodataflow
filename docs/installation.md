@@ -1,61 +1,67 @@
 # Installation
 
-Echodataflow requires Python 3.12 or newer. A Conda environment is recommended because
-the processing stack contains compiled scientific and geospatial dependencies.
+Echodataflow requires Python 3.12 or newer. A Conda environment is recommended because the processing stack contains compiled scientific and geospatial dependencies.
 
-## Install from the source repository
 
-The `0.2` release is still under development, so install the current source:
+## Create a Conda environment
+
+Create and activate an environment:
 
 ```shell
-conda create -n echodataflow -c conda-forge python=3.12 uv
+conda create --name echodataflow -c conda-forge python=3.13 uv
 conda activate echodataflow
-uv pip install "git+https://github.com/echostack-org/echodataflow.git"
 ```
 
-This installs the `echodataflow-deploy` command.
+If your system does not already have rclone, include it when creating the environment by using the command below, then activate the environment:
+
+```shell
+conda create --name echodataflow -c conda-forge python=3.13 uv rclone
+conda activate echodataflow
+```
+
+Once done, verify that rclone is installed by running:
+```shell
+rclone version
+```
+
+
+## Install from the repository
+
+The Echodataflow `v0.2.0` release is still under development. To run Echodataflow as an installed package, install it directly from the repository:
+
+```shell
+uv pip install "echodataflow[dev,mission,inference] @ git+https://github.com/echostack-org/echodataflow.git"
+```
+
+The installation enables the `echodataflow-deploy` command, which can be run from any directory.
+Verify that this is correctly installed by running:
 
 ```shell
 echodataflow-deploy --help
 python -c "import echodataflow; print(echodataflow.__version__)"
 ```
 
-## Install the processing dependencies you need
+Adding `[dev,mission,inference]` in the `uv pip install` command above
+install the full suite of optional dependencies specified in `pyproject.toml`:
 
-Echodataflow orchestrates packages that are not all installed as core dependencies while
-the `0.2` dependency set is being finalized. Install Echopype to run the acoustic conversion
-flows:
+- `dev`: testing, linting, code quality, documentation tools, and Jupyter kernel support.
+- `mission`: Echopype, Echoshader, Echoregions, and other mission processing dependencies.
+- `inference`: the hake segmentation model, needed for running the `predict_hake` flow.
 
-```shell
-uv pip install echopype
-```
+:::{note}
+The hake segmentation model weight can be separately downloaded from [LINK] and
+set its path via the `path_weight` for the `predict_hake` flow to function.
+:::
 
-The `predict_hake` flow also needs the hake segmentation package and compatible model
-weights:
 
-```shell
-git clone https://github.com/uw-echospace/segmentation_inference.git
-uv pip install -e ./segmentation_inference
-```
 
-Model weights are not distributed with Echodataflow. Obtain the model approved for your
-project and set `path_weight` in the parameter recipe.
-
-## Install system tools
-
-The file-upload flow invokes [rclone](https://rclone.org/). Install it with your platform's
-package manager, then verify it is visible inside the environment used by the Prefect worker:
-
-```shell
-rclone version
-```
-
-For macOS background services, install `sqlite3` and Conda or Mamba at stable absolute
-paths. On Linux, `systemd` must be available if you intend to use the service examples.
 
 ## Get the deployment recipes
 
-Mission recipes are maintained separately from the package:
+Example recipes are maintained separately on a companion repository
+[echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes).
+You can download the recipes directly from the repo or get a copy by
+cloning the repo:
 
 ```shell
 git clone https://github.com/echostack-org/echodataflow-recipes.git
@@ -63,34 +69,33 @@ git clone https://github.com/echostack-org/echodataflow-recipes.git
 
 Each deployment uses two YAML files:
 
-- `recipes/params/params_*.yaml` contains arguments passed to flows.
-- `recipes/deploy/deploy_*.yaml` contains schedules, triggers, work pools, and source code
+- `recipes/deploy/deploy_*.yaml` contains deployment configurations such as schedules, triggers, work pools, and source code location.
   selection.
+- `recipes/params/params_*.yaml` contains parameters passed to the flows.
 
-The paired files must contain the same keys below their top-level `flows` mappings.
+For any given deployment, the pair of files must contain the same keys below their top-level `flows` mappings.
 
-## Connect to Prefect
 
-For a local server:
-
-```shell
-prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
-prefect server start
-```
-
-In another terminal, create a process work pool and start a worker:
-
-```shell
-prefect work-pool create --type process local
-prefect worker start --pool local
-```
-
-If the pool already exists, Prefect reports that fact and it can be reused. See
-[Deployment](deployment.md) before installing the server or worker as an operating-system
-service.
 
 ## Install for development
 
-Do not combine a development checkout with the commands above. Use the editable setup in
-[Development](development.md), which includes tests, linting, and documentation tools.
+To actively change Echodataflow code to add new flows or other modifications,
+create and activate a conda environment, and then clone and install Echodataflow
+in editable mode with the same full suite of optional dependencies:
 
+```shell
+# Creat and activate a conda environment for development
+conda create --name echodataflow -c conda-forge python=3.13 uv
+conda activate echodataflow
+
+# Clone and install Echodataflow in editable mode (-e)
+git clone https://github.com/echostack-org/echodataflow.git
+cd echodataflow
+uv pip install -e ".[dev,mission,inference]"
+```
+
+The `inference` extra installs `segmentation_inference`; download model weights separately
+as described above. See [Development](development.md) for contribution instructions and testing.
+
+After installation, follow [Deployment](deployment.md) to configure Prefect, start a worker,
+and deploy workflows.

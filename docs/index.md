@@ -1,12 +1,14 @@
 # Echodataflow
 
-Echodataflow turns configuration files into repeatable fisheries acoustics workflows. It
-combines [Prefect](https://www.prefect.io/) orchestration with processing functions from
-[Echopype](https://echopype.readthedocs.io/) and other Echostack tools, allowing the same
-workflow design to run on a shipboard computer, a workstation, or cloud infrastructure.
+Echodataflow provides recipe-driven orchestration for echosounder data processing workflows.
+It combines [Prefect](https://www.prefect.io/), YAML deployment recipes, and tools
+such as [Echopype](https://github.com/echostack-org/echopype) to run workflows on different
+computing infrastructures.
 
-Echodataflow is currently under active development. The previous `0.1.x` design is
-deprecated; these pages describe the forthcoming `0.2` architecture.
+Echodataflow `v0.1.x` is deprecated. We are currently preparing for the `v0.2.0` release,
+which contains a redesigned architecture and more straightforward mechanisms to add workflow
+components.
+
 
 ## Why Echodataflow?
 
@@ -31,8 +33,8 @@ Its main goals are to:
   deploying workflows.
 - [Examples](examples.md) explains common recipe patterns and walks through a simulated
   edge workflow.
-- [Development](development.md) covers a Conda and `uv` development environment and how
-  to add a workflow step.
+- [Development](development.md) covers contribution practices and how to add a workflow
+  step.
 - [Workflow reference](reference.md) catalogs the currently registered flows and recipe
   fields.
 
@@ -42,4 +44,3 @@ Recipes used for real missions live in the separate
 [echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes) repository.
 Treat those recipes as deployment-specific examples: review paths, credentials, schedules,
 and resource requirements before using them on another system.
-

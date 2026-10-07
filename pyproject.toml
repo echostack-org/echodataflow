@@ -65,18 +65,19 @@ mission = [
     "torch",
 ]
 
-notebook = [
-    "ipykernel",
+inference = [
+    "segmentation-inference @ git+https://github.com/uw-echospace/segmentation_inference.git",
 ]
 
-test = [
+dev = [
+    # notebooks
+    "ipykernel",
+    # tests
     "pytest",
     "pytest-cov",
     "pytest-xdist",
     "pytest-mock",
-]
-
-lint = [
+    # lint
     "black",
     "check-manifest",
     "isort",
@@ -85,9 +86,7 @@ lint = [
     "pre-commit",
     "pylint",
     "ruff",
-]
-
-docs = [
+    # docs
     "jupyter-book>=2.0.0",
 ]
 
