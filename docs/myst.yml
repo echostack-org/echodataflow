@@ -1,0 +1,22 @@
+version: 1
+
+project:
+  title: Echodataflow
+  description: Recipe-driven orchestration for fisheries acoustics workflows
+  github: https://github.com/echostack-org/echodataflow
+  license: Apache-2.0
+  toc:
+    - file: index.md
+    - file: installation.md
+    - file: guide.md
+    - file: deployment.md
+    - file: examples.md
+    - file: development.md
+    - file: reference.md
+
+site:
+  template: book-theme
+  options:
+    navigation:
+      style: sidebar
+

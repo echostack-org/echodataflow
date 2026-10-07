@@ -1,0 +1,44 @@
+flows:
+  copy_raw:
+    path_raw_list: /tmp/echodataflow-demo/raw-files.csv
+    path_copy: /tmp/echodataflow-demo/raw
+    s3_bucket: noaa-wcsd-pds
+    exclude_before: "2024-07-06T23:59:00+00:00"
+
+  raw2Sv:
+    exclude_before: "2024-07-06T23:59:00+00:00"
+    exclude_raw_file: []
+    parallel: false
+    encode_mode: power
+    waveform_mode: CW
+    depth_offset: 7
+    sonar_model: EK80
+    nmea_sentence: GGA
+    filename_pattern: "Hake-*.raw"
+    path_raw: /tmp/echodataflow-demo/raw
+    path_main: /tmp/echodataflow-demo/processed
+    file_Sv_csv: Sv_files.csv
+    new_file_num_limit: 2
+
+  create_MVBS:
+    slice_mins: 20
+    num_slices: 1
+    range_bin: 1m
+    ping_time_bin: 5s
+    path_main: /tmp/echodataflow-demo/processed
+    file_Sv_csv: Sv_files.csv
+    file_MVBS_csv: MVBS_files.csv
+
+  file_upload_acoustics:
+    src_dir: /tmp/echodataflow-demo/processed
+    dest_dir: /tmp/echodataflow-demo/mock-cloud/acoustics
+    exclude_subdirs:
+      - Sv
+    max_age: -1
+
+  file_upload_trawl:
+    src_dir: /tmp/echodataflow-demo/trawl
+    dest_dir: /tmp/echodataflow-demo/mock-cloud/trawl
+    exclude_subdirs: []
+    max_age: -1
+
