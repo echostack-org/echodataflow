@@ -149,7 +149,7 @@ names.
 
 ### 5. Add paired recipe entries
 
-The parameter recipe key and deployment recipe key must match. The deployment key defaults
+The parameters recipe key and deployment recipe key must match. The deployment key defaults
 to the registry key; set `flow: example` when multiple recipe entries reuse the same flow.
 
 ### 6. Test each layer

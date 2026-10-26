@@ -10,18 +10,18 @@ Echodataflow executes echosounder data processing pipelines by following the "re
 Each data processing pipeline is defined by a pair of recipes: the "deployment" and "parameters" recipes. The recipes are organized around the concept of "flow," whcih is the central container of workflow logic in Prefect. The flows are regular Python functions decorated by `@flow` that makes it possible for Prefect to execute and monitor the operations.
 
 In Echodataflow:
-- The **deployment recipe** contains flow deployment specifications, such as timing and computing resources.
-- The **parameter recipe** contains input parameters for the specific flow functions.
+- The **deployment recipe** contains flow deployment specifications that controls _how_ the flows are run, such as timing and computing resources.
+- The **parameters recipe** contains input parameters for the flow functions, which controls _what_ are run in the flows.
 
 Under the hood, the Echodataflow deployment engine parses the recipes to assemble and execute the workflow using mechanisms available from the the open-source [Prefect](https://www.prefect.io/) workflow orchestration package. 
 
-The flows currently available in the Echodataflow package were developed to support the development team's research work to execute near-real-time echosounder data processing on ocean platforms and post-processing archived data. See the Echodataflow-recipes repository for reproducible examples of the near-real-time and post-processing worflows, and [](recipe-spec) for details on preparing the deployment parameter recipes.
+The flows currently available in the Echodataflow package were developed to support the development team's research work to execute near-real-time echosounder data processing on ocean platforms and post-processing archived data. See [](recipe-spec) for details on preparing the deployment parameters recipes and the [Echodataflow-recipes repository](https://github.com/OSOceanAcoustics/echodataflow-recipes) for reproducible examples of near-real-time and post-processing worflows.
 
 
 
 
 ## Local deployment setup
-To deploy a pipeline on a local computere, we need a local Prefect server and work pools:
+To deploy a pipeline on a local computere, we need a local Prefect server and workers in work pools:
 - The [server](https://docs.prefect.io/v3/concepts/server) orchestrates the execution of flows and provides visibility into the status of each flow run
 - The [work pools](https://docs.prefect.io/v3/concepts/work-pools) connect the orchestration layer to the computing infrastructure where flows run and define how that infrastructure is configured.
 
@@ -80,12 +80,13 @@ prefect worker start --pool local --type process
 
 
 :::{note}
-If the worker is not connected correctly to Prefect Cloud, check if `PREFECT_API_URL` is set to a local server or points to the wrong workspace:
+If the worker is not connected correctly to Prefect Cloud, check if `PREFECT_API_URL` is incorrectly set to a local server or points to the wrong workspace:
 ```shell
 `prefect config view | grep PREFECT_API_URL`
 ```
-I may be convenient to unset it before logging in by running:
+It may be useful to unset it before logging in by running:
 ```shell
 prefect config unset PREFECT_API_URL
 ```
+even though `prefect cloud login` normally sets the Cloud workspace URL and API key itself.
 :::

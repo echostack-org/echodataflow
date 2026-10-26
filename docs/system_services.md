@@ -10,7 +10,7 @@ Note that Prefect also provides a mechanism to run a server and related resource
 
 
 
-## `services.env`
+## Template for environment settings
 
 The system services templates provided in Echodataflow use `services.env` to control the many parameters used in the system services through environment variables. To set this up, copy `src/echodataflow/services/services.env.example_local_{OS_TYPE}` to `~/.config/echodataflow/services.env` by:
 ```shell

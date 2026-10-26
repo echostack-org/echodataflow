@@ -3,9 +3,9 @@
 This page first explains reusable deployment patterns, then provides a small simulated edge
 workflow that does not require write access to somebody else's cloud account.
 
-## Reading a parameter recipe
+## Reading a parameters recipe
 
-A parameter recipe contains exactly the keyword arguments passed to each flow. The example
+A parameters recipe contains exactly the keyword arguments passed to each flow. The example
 in [`examples/params-edge-example.yaml`](examples/params-edge-example.yaml) demonstrates:
 
 - `copy_raw`: replaying a public NOAA S3 manifest into a local arrival directory;
