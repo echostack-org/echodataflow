@@ -24,13 +24,14 @@ Echodataflow is currently developed and maintained by by Wu-Jung Lee ([@leewujun
 
 
 
-## Acknowledgement
+## Funding acknowledgement
 We thank funding support from the NOAA Northwest Fisheries Science Center and the 
 Active Acoustics Strategic Inititave (AA-SI) to the development of Echodataflow.
 
-<a href="https://upload.wikimedia.org/wikipedia/commons/7/79/NOAA_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original" style="text-decoration:none;">
-    <img src="https://upload.wikimedia.org/wikipedia/commons/7/79/NOAA_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original" alt="NOAA" width="120">
-</a>
+:::{image} https://upload.wikimedia.org/wikipedia/commons/7/79/NOAA_logo.svg
+:alt: NOAA
+:width: 120px
+:::
 
 
 

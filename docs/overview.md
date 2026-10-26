@@ -20,14 +20,14 @@ The flows currently available in the Echodataflow package were developed to supp
 
 
 
-## Deployment setup
-To deploy a workflow, we need a server and the work pools:
+## Local deployment setup
+To deploy a pipeline on a local computere, we need a local Prefect server and work pools:
 - The [server](https://docs.prefect.io/v3/concepts/server) orchestrates the execution of flows and provides visibility into the status of each flow run
 - The [work pools](https://docs.prefect.io/v3/concepts/work-pools) connect the orchestration layer to the computing infrastructure where flows run and define how that infrastructure is configured.
 
 
-### Quick local testin
-For quick local testing, start a Prefect server and a worker in separate terminals:
+(server-workpool-terminal)=
+For quick local testing, start a Prefect server and a work pool in separate terminals:
 
 1. In the first terminal, start the server:
 
@@ -39,12 +39,53 @@ For quick local testing, start a Prefect server and a worker in separate termina
 
    ```shell
    prefect config set PREFECT_API_URL=http://127.0.0.1:4200/api
-   prefect worker start --pool local
+   prefect worker start --pool local --type process
+   ```
+
+   To confirm that the work pool exists, run
+   ```shell
+   prefect work-pool ls
    ```
 
 Open the Prefect dashboard at <http://127.0.0.1:4200> to monitor flow runs. Keep the server and worker running while testing deployments.
 
 
-### Operational deployments
-For operational deployments, these can be run via system services so that they start automatically on boot and restart if they fail. See [](deployment-system-services) for details on running them on different operating systems.
 
+:::{note}
+For operational deployments from a local server, these can be run via system services so that they start automatically on boot and restart if they fail. See [](deployment-system-services) for details on running them on different operating systems.
+:::
+
+
+
+
+
+## Use Prefect Cloud
+It is also possible to use Prefect Cloud to orchestrate flow executions without running a local Prefect server. Below we show the steps to authenticate with Prefect Cloud and start a worker locally that Prefect Cloud can orchestrate.
+
+1. To authenticate and select the workspace that will receive your deployments, run:
+```shell
+prefect cloud login
+prefect cloud workspace set --workspace "<account-handle>/<workspace-handle>"
+```
+
+You can also manually configure the `PREFECT_API_URL` setting to specify the Prefect Cloud API. See the [Prefect Cloud connection guide](https://docs.prefect.io/v3/how-to-guides/cloud/connect-to-cloud)
+for details and API key configuration.
+
+
+2. To execute flows on your computer while Prefect Cloud handles orchestration, start a local worker in the environment configured above by running:
+
+```shell
+prefect worker start --pool local --type process
+```
+
+
+:::{note}
+If the worker is not connected correctly to Prefect Cloud, check if `PREFECT_API_URL` is set to a local server or points to the wrong workspace:
+```shell
+`prefect config view | grep PREFECT_API_URL`
+```
+I may be convenient to unset it before logging in by running:
+```shell
+prefect config unset PREFECT_API_URL
+```
+:::
