@@ -10,9 +10,9 @@ project:
     - file: installation.md
     - file: overview.md
     - file: recipe_spec.md
+    - file: package_structure.md
+    - file: add_flow.md
     - file: system_services.md
-    # - file: examples.md
-    # - file: development.md
 
 site:
   template: book-theme
