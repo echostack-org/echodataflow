@@ -198,8 +198,8 @@ test_server = pn.serve(
     # Additional settings to prevent auto-refresh issues
     autoreload=False,
     # Keep WebSocket connection stable
-    keep_alive=40000,
-    check_unused_sessions_milliseconds=30000,
+    keep_alive=40000,  # 40 seconds
+    check_unused_sessions_milliseconds=30000,  # 30 seconds
 )
 
 # test_server.stop()
