@@ -44,7 +44,7 @@ echodataflow-deploy run
 
 
 
-
+(recipe-spec_deployment)=
 ## Deployment recipe
 
 ### Top-level fields
@@ -282,6 +282,8 @@ Assuming this rerun pipeline was deployed at `2026-10-26T10:15:23+00:00` actual 
 
 
 
+
+(recipe-spec_parameters)=
 ## Parameters recipe
 
 The parameters recipe is straightforward to specify, because the entries under a recipe key are simply input arguments of the flow function. 
