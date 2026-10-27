@@ -37,7 +37,7 @@ from echodataflow.utils.utils import get_slice_start_end_times, round_up_mins
 
 
 @flow(log_prints=True)
-async def flow_predict_hake(
+async def flow_classify_backscatter(
     time_offset_seconds: float = 0.0,
     slice_mins: int = 10,
     num_slices: int = 3,
@@ -245,7 +245,7 @@ async def flow_predict_hake(
 
 
 @flow(log_prints=True)
-def flow_predict_hake_postprocessing(
+def flow_classify_backscatter_postprocessing(
     path_main: str,
     path_weight: str,
     prediction_slice_mins: int = 40,

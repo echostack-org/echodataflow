@@ -33,7 +33,7 @@ def test_local_deploy_specs_generate_current_flow_targets(install_prefect_stubs)
             "copy_raw": {"interval": 1},
             "raw2Sv": {"interval": 1},
             "create_MVBS": {"interval": 1},
-            "predict_hake": {"interval": 1},
+            "classify_backscatter": {"interval": 1},
             "file_upload_acoustics": {
                 "flow": "file_upload",
                 "interval": 1,
@@ -61,7 +61,7 @@ def test_local_deploy_specs_generate_current_flow_targets(install_prefect_stubs)
         "copy_raw": "flows_simulation",
         "raw2Sv": "flows_acoustics",
         "create_MVBS": "flows_acoustics",
-        "predict_hake": "flows_predict_hake",
+        "classify_backscatter": "flows_classify_backscatter",
         "file_upload_acoustics": "flows_helper",
         "file_upload_trawl": "flows_helper",
     }
@@ -105,7 +105,7 @@ def test_local_deploy_specs_generate_current_flow_targets(install_prefect_stubs)
         "copy_raw": "echodataflow/flows/flows_simulation.py:flow_copy_raw",
         "raw2Sv": "echodataflow/flows/flows_acoustics.py:flow_raw2Sv",
         "create_MVBS": "echodataflow/flows/flows_acoustics.py:flow_create_MVBS",
-        "predict_hake": "echodataflow/flows/flows_predict_hake.py:flow_predict_hake",
+        "classify_backscatter": "echodataflow/flows/flows_classify_backscatter.py:flow_classify_backscatter",
         "file_upload_acoustics": "echodataflow/flows/flows_helper.py:flow_file_upload",
         "file_upload_trawl": "echodataflow/flows/flows_helper.py:flow_file_upload",
     }

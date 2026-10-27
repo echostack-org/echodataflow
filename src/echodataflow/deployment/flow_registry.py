@@ -21,8 +21,8 @@ FLOW_REGISTRY: dict[str, FlowRegistration] = {
     "create_MVBS": FlowRegistration(
         entrypoint="echodataflow/flows/flows_acoustics.py:flow_create_MVBS",
     ),
-    "predict_hake": FlowRegistration(
-        entrypoint="echodataflow/flows/flows_predict_hake.py:flow_predict_hake",
+    "classify_backscatter": FlowRegistration(
+        entrypoint="echodataflow/flows/flows_classify_backscatter.py:flow_classify_backscatter",
     ),
     "raw2Sv_postprocessing": FlowRegistration(
         entrypoint=(
@@ -38,12 +38,12 @@ FLOW_REGISTRY: dict[str, FlowRegistration] = {
         ),
         description="Create all newly ready historical MVBS slices.",
     ),
-    "predict_hake_postprocessing": FlowRegistration(
+    "classify_backscatter_postprocessing": FlowRegistration(
         entrypoint=(
-            "echodataflow/flows/flows_predict_hake.py:"
-            "flow_predict_hake_postprocessing"
+            "echodataflow/flows/flows_classify_backscatter.py:"
+            "flow_classify_backscatter_postprocessing"
         ),
-        description="Predict all newly ready historical MVBS windows.",
+        description="Classify backscatter in all newly ready historical MVBS windows.",
     ),
     "ingest_haul": FlowRegistration(
         entrypoint="echodataflow/flows/flows_biology.py:flow_ingest_haul",
