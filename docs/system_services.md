@@ -4,7 +4,6 @@
 Echodataflow requires a Prefect server and workers in work pools to deploy a pipeline. While it is possible to deploy a pipeline by running a server and workers [simply via terminal](server-workpool-terminal), it is more robust to run them as long-running processes via system services in the operating system (OS) so that the processes will restart automatically if system crashes.
 
 In the sections we explain the mechanism we use to run a server and a worker as system services on a machine running MacOS.
-<!-- TODO add instructions for Linux and Windows-->
 
 Note that Prefect also provides a mechanism to run a server and related resources [via Docker compose](https://docs.prefect.io/v3/how-to-guides/self-hosted/docker-compose).
 

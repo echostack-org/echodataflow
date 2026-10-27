@@ -256,30 +256,24 @@ Remote scheduler addresses and other Dask cluster options are not yet supported 
 
 
 
+### Simulated rerun
 
+For pipelines that handle real-time data, the flows can be deployed to simulate a "rerun" by effectively moving the current time to an earlier timepoint as if the flows were deployed from the starting timestamp (`flow_start_time`). This can be configured by setting `flow_start_time` at the top-level and adding `inject_time_offset: True` to the supporting flows. 
 
-### Simulate rerun
-Each trigger requires non-empty strings for `expect` (the event name) and
-`resource_name` (the resource name to match). `interval` and `triggers` are
-mutually exclusive.
+Current flows that support simulated returns are: `flow_raw2Sv`, `flow_create_MVBS`, and `flow_classify_backscatter`. These flows accepts an argument `time_offset_seconds` that contains the difference between the current time and `flow_start_time`, which is automatically populated at run time.
 
-For historical simulation, top-level `flow_start_time` supplies an ISO 8601
-starting timestamp. Set `inject_time_offset` to `true` on each compatible flow to
-inject `time_offset_seconds`, calculated as the difference between the current
-time and that timestamp. This maps the current wall clock to a historical mission
-clock; it does not change the deployment schedule.
-
+For example:
 ```yaml
 flow_start_time: "2026-10-01T00:00:00+00:00"
 flows:
   raw2Sv:
     interval: 10
     inject_time_offset: true
+  create_MVBS:
+    interval: 20
+    inject_time_offset: true
 ```
-
-Injection is disabled when omitted. When enabled without `flow_start_time`, the
-injected offset is `0.0`. The target flow must declare `time_offset_seconds`;
-validation rejects incompatible flows.
+Assuming this rerun pipeline was deployed at `2026-10-26T10:15:23+00:00` actual time. Both the `raw2Sv` and `create_MVBS` will behave as if they were deployed at `2026-10-01T00:00:00+00:00`. For example, after the pipeline has been running for a while and the actual time is `2026-10-26T12:32:46+00:00`, the flows would behave as if it was `2026-10-01T02:17:46+00:00`.
 
 
 
