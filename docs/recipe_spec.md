@@ -180,20 +180,9 @@ When `work_pool_name` is omitted, the flow uses the recipe's default work pool s
 
 ### Concurrency configuration
 
-Echodataflow supports two types of concurrency limits, one at the flow level and the other at the run level.
+Echodataflow supports two types of concurrency limits: a shared limit across multiple deployments (`concurrency_group`) and a limit for an individual deployment (`deployment_concurrency`).
 
-At the flow level, flows that share the same concurrency group (specified by the keyword `concurrency_group` under the recipe key) are bounded by the limit set in the top-level specifications.
-
-At the run level, runs of the same flow are bounded by the limit set by the `deployment_concurrency` key under the recipe key.
-
-Use concurrency limits when overlapping runs would compete for resources or write
-to the same outputs. A shared concurrency group limits runs across deployments;
-`deployment_concurrency` limits runs of one deployment. Both can be configured,
-and a run must satisfy the applicable limits before it can execute.
-
-To share a limit, define a group under top-level `concurrency_groups` and reference
-it with each flow's `concurrency_group`:
-
+**Across multiple deployments (`concurrency_group`):** flows assigned to the same `concurrency_group` share the concurrency limit defined under top-level `concurrency_groups`. This limit controls how many runs across those flows can execute at the same time/ For example:
 ```yaml
 concurrency_groups:
   disk_processing:
@@ -201,68 +190,51 @@ concurrency_groups:
 flows:
   raw2Sv:  # recipe key
     concurrency_group: disk_processing
-  fetch_spasso:
+  create_MVBS:
     concurrency_group: disk_processing
 ```
+Here, at most one run (`limit: 1`) across the `raw2Sv` flow and the `create_MVBS` flow can run at the same time in the Prefect work queue named `disk_processing`. When `concurrency_group` is omitted, the flows are not bounded by the a named group queue.
 
-The engine creates or updates a Prefect work queue named `disk_processing` with
-the specified limit. Here, at most one run across these deployments can execute
-at a time; other runs wait for queue capacity. `limit` must be a positive integer,
-and every member must use the same work pool. A referenced group must be defined.
-When `concurrency_group` is omitted, the engine does not assign a named group queue.
-Shared groups have no `collision_strategy` option.
 
-To limit overlapping runs of one deployment and choose how to handle conflicts:
+**Within an individual deployment (`deployment_concurrency`):** runs of the same flow are bounded by the limit set by the `deployment_concurrency` key under the recipe key. When `deployment_concurrency` is omitted, multiple runs of the same flow deployment can happen simultaneously. `deployment_concurrency` accepts:
+- `limit`: required positive integer specifying the maximum concurrent flow runs for this deployment.
+- `collision_strategy`:
+  - `ENQUEUE` (the default) leaves a conflicting run waiting until capacity is available. Use this when every run should eventually execute.
+  - `CANCEL_NEW` cancels the new conflicting run while existing runs continue; use this when skipping an overlapping run is acceptable.
+- `grace_period_seconds`: startup grace period for the reserved concurrency slot, from `60` to `86400` seconds. Increase it when infrastructure starts slowly.  When omitted, Prefect uses its server setting,
+  `PREFECT_SERVER_CONCURRENCY_INITIAL_DEPLOYMENT_LEASE_DURATION`, which defaults to `300` seconds.
 
+
+For example:
 ```yaml
 flows:
   raw2Sv:
     deployment_concurrency:
       limit: 1
-      collision_strategy: ENQUEUE
+      collision_strategy: CANCEL_NEW
       grace_period_seconds: 600
 ```
+Here, at most one run of `raw2Sv` can be active at a time, and new runs are cancelled while that run holds the concurrency slot. `grace_period_seconds: 600` gives the accepted run up to 10 minutes for its infrastructure to start before its slot reservation expires. This does not affect how the new runs are handled. 
 
-`deployment_concurrency` accepts:
 
-- `limit`: required positive integer specifying the maximum concurrent flow runs
-  for this deployment.
-- `collision_strategy`: `ENQUEUE` (the default) leaves a conflicting run waiting
-  until capacity is available. Use this when every run should eventually execute.
-  `CANCEL_NEW` cancels the new conflicting run while existing runs continue; use
-  this when skipping an overlapping run is acceptable.
-- `grace_period_seconds`: startup grace period for the reserved concurrency slot,
-  from `60` to `86400` seconds. Increase it when infrastructure starts slowly.
-  When omitted, Prefect uses its server setting,
-  `PREFECT_SERVER_CONCURRENCY_INITIAL_DEPLOYMENT_LEASE_DURATION`, whose default
-  is `300` seconds. This is not a flow runtime limit: running flows renew their
-  concurrency leases. See [Prefect's concurrency schema](https://github.com/PrefectHQ/prefect/blob/main/src/prefect/client/schemas/objects.py)
-  and [server defaults](https://github.com/PrefectHQ/prefect/blob/main/src/prefect/settings/models/server/concurrency.py).
 
-When `deployment_concurrency` is omitted, the engine supplies no per-deployment
-limit. When both concurrency settings are omitted, this recipe adds no concurrency
-limits; existing pool, queue, worker, or server configuration may still limit runs.
 
 ### Task runner
 
-A task runner controls how submitted Prefect tasks execute within a flow run.
-For flows using Echodataflow's runtime task-runner selection, omitting `task_runner`
-uses Prefect's `ThreadPoolTaskRunner`. Select this default by leaving the field out;
-`type: thread` and `type: threadpool` are not accepted recipe values. A flow must
-submit tasks for the runner to provide concurrent task execution.
+A task runner controls how Prefect tasks execute within a flow run. Currently, `dask` is the only supported task runner (using Prefect's `DaskTaskRunner`). If no task runner is specified, Prefect's default `ThreadPoolTaskRunner` will be used.
 
-The only explicit recipe type currently supported is `dask`. To use a Dask task
-runner with its default local-cluster settings:
+The `DaskTaskRunner` cluster can be specified by the following options:
+- `n_workers`: positive integer number of Dask workers in this flow run's cluster.  These are separate from the Prefect workers polling a work pool.
+- `threads_per_worker`: positive integer number of task-execution threads per Dask worker.
+- `processes`: 
+  - When `true`, each worker runs in a separate operating-system process with its own Python interpreter and memory space, allowing Python computations to use multiple CPU cores at the cost of transferring data between processes.
+  - When `false`, workers share one process and execute tasks in threads, reducing transfer overhead. Python's Global Interpreter Lock (GIL) can limit CPU parallelism with threads, though I/O tasks and libraries that release the GIL can still benefit.
+- `memory_limit`: memory budget per Dask worker, such as `2GiB` or `auto`. Dask enforces this on a best-effort basis with process workers; it is not a memory reservation for the whole deployment.
 
-```yaml
-flows:
-  raw2Sv:
-    task_runner:
-      type: dask
-```
+When `cluster_kwargs` or individual options are omitted, Dask's defaults are used: `n_workers` and `threads_per_worker` are derived from the machine, `processes` defaults to `true` for the standard local cluster, and `memory_limit` defaults to `auto`, dividing system memory between workers. See the [Dask LocalCluster reference](https://docs.dask.org/en/stable/deploying-python.html#localcluster)
+for these behaviors. 
 
-To configure that cluster, add `cluster_kwargs`:
-
+For example:
 ```yaml
 flows:
   raw2Sv:
@@ -274,32 +246,14 @@ flows:
         processes: true
         memory_limit: 2GiB
 ```
+Here, the `DaskTaskRunner` is configured with 2 workers, each using 1 thread and a memory limit of 2 GiB. With `processes: true`, each worker runs in a separate operating-system process, giving it its own Python interpreter and memory space.
 
-The accepted cluster options are:
 
-- `n_workers`: positive integer number of Dask workers in this flow run's cluster.
-  These are separate from the Prefect workers polling a work pool.
-- `threads_per_worker`: positive integer number of task-execution threads per
-  Dask worker.
-- `processes`: boolean choosing separate worker processes (`true`) or workers in
-  the same process (`false`).
-- `memory_limit`: memory budget per Dask worker, such as `2GiB` or `auto`.
-  Dask enforces this on a best-effort basis with process workers; it is not a
-  memory reservation for the whole deployment.
+:::{note}
+Remote scheduler addresses and other Dask cluster options are not yet supported by the recipe schema. Each flow run configured with `DaskTaskRunner` creates its own local Dask cluster, so choose worker counts, memory limits, and flow concurrency limits together to avoid overloading the machine. Support for connecting to an existing cluster is an area of improvement in the near future.
+:::
 
-When `cluster_kwargs` or individual options are omitted, the engine leaves them
-to Dask's defaults: worker and thread counts are derived from the machine,
-`processes` defaults to `true` for the standard local cluster, and `memory_limit`
-defaults to `auto`, dividing system memory between workers.
-See the [Dask LocalCluster reference](https://docs.dask.org/en/stable/deploying-python.html#localcluster)
-for their behavior. Remote scheduler addresses and other Dask cluster options are
-not accepted by the current recipe schema.
 
-The engine passes task-runner settings to the flow's runtime environment. They
-take effect for flows wired to Echodataflow's `task_runner_from_environment()`
-helper; other flows retain their own runner configuration. Each concurrent flow
-run may create its own Dask cluster, so size the cluster together with the
-concurrency limits to fit the execution machine.
 
 
 
