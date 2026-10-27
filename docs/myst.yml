@@ -7,12 +7,17 @@ project:
   license: Apache-2.0
   toc:
     - file: index.md
-    - file: installation.md
-    - file: overview.md
-    - file: recipe_spec.md
-    - file: package_structure.md
-    - file: add_flow.md
-    - file: system_services.md
+    - title: User guide
+      children:
+        - file: installation.md
+        - file: overview.md
+        - file: recipe_spec.md
+        - file: package_structure.md
+        - file: add_flow.md
+        - file: system_services.md
+    - title: References
+      children:
+        - file: prefect_terminology.md
 
 site:
   template: book-theme
