@@ -37,4 +37,4 @@ Active Acoustics Strategic Inititave (AA-SI) to the development of Echodataflow.
 
 ## License
 
-Echodataflow is distributed under the [Apache License 2.0](LICENSE).
+Echodataflow is distributed under the [Apache License 2.0](https://github.com/echostack-org/echodataflow/blob/main/LICENSE).

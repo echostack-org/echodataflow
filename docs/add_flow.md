@@ -1,7 +1,6 @@
 # How to add a flow
 
-To run a new flow through Echodataflow's orchestration mechanisms, write the flow, register its entrypoint, and include it in paired parameter and deployment recipes. This guide walks through those steps with a small example that appends the current UTC time for two labels to one CSV file every five minutes. See [Development](development.md) for setting up your environment and running tests.
-
+To run a new flow through Echodataflow's orchestration mechanisms, write the flow, register its entrypoint, and include it in paired parameter and deployment recipes. This page walks through these steps with a small example that appends the current UTC time for two labels to one CSV file every five minutes.
 
 
 
