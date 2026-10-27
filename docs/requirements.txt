@@ -1,6 +1,1 @@
-jupyter-book
-matplotlib
-numpy
-sphinx
-nbsphinx
-recommonmark
+jupyter-book>=2.0.0

@@ -1,0 +1,27 @@
+version: 1
+
+project:
+  title: Echodataflow
+  description: Recipe-driven orchestration of echosounder data processing pipelines
+  github: https://github.com/echostack-org/echodataflow
+  license: Apache-2.0
+  toc:
+    - file: index.md
+    - title: User guide
+      children:
+        - file: installation.md
+        - file: overview.md
+        - file: recipe_spec.md
+        - file: package_structure.md
+        - file: add_flow.md
+        - file: system_services.md
+    - title: References
+      children:
+        - file: prefect_terminology.md
+
+site:
+  template: book-theme
+  options:
+    navigation:
+      style: sidebar
+

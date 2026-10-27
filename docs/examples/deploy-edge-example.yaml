@@ -1,0 +1,34 @@
+flow_start_time: "2024-07-07T00:00:00+00:00"
+
+source:
+  mode: local
+
+default_work_pool_name: local
+
+flows:
+  copy_raw:
+    deployment_name: copy-raw
+    interval: 10
+    inject_time_offset: true
+
+  raw2Sv:
+    deployment_name: raw2Sv
+    interval: 10
+
+  create_MVBS:
+    deployment_name: create-MVBS
+    interval: 10
+    cron_offset: 3
+    inject_time_offset: true
+
+  file_upload_acoustics:
+    flow: file_upload
+    deployment_name: file-upload-acoustics
+    interval: 10
+
+  file_upload_trawl:
+    flow: file_upload
+    deployment_name: file-upload-trawl
+    interval: 10
+    cron_offset: 3
+
