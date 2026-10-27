@@ -2,7 +2,7 @@ version: 1
 
 project:
   title: Echodataflow
-  description: Recipe-driven orchestration for fisheries acoustics workflows
+  description: Recipe-driven orchestration of echosounder data processing pipelines
   github: https://github.com/echostack-org/echodataflow
   license: Apache-2.0
   toc:
