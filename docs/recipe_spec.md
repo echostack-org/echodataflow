@@ -61,6 +61,7 @@ echodataflow-deploy run
 
 
 
+(recipe-spec_flow)=
 ### Flow specifications
 
 Each key below `flows` identifies a deployment and must also appear in the parameters recipe. The deployment engine will generate an error if some recipe keys are missing in one of the recipe files.
@@ -281,13 +282,19 @@ Assuming this rerun pipeline was deployed at `2026-10-26T10:15:23+00:00` actual 
 
 ## Parameters recipe
 
-The parameters recipe has one required top-level mapping:
+The parameters recipe is straightforward to specify, because the entries under a recipe key are simply input arguments of the flow function. 
 
+For example,
 ```yaml
 flows:
-  registry-or-recipe-key:
-    parameter_name: value
+  file_upload_acoustics:  # recipe key
+    src_dir: /data/acoustics
+    dest_dir: cloud:bucket/mission/acoustics
+    exclude_subdirs:
+      - Sv
+      - raw
+    max_age: 2
 ```
+Here, the flow function `flow_file_upload` underlying the `file_upload_acoustics` flow (specified in the deployment recipe, see [](recipe-spec_flow)) accepts 4 input arguments: `src_dir`, `dest_dir`, `exclude_subdirs`, and `max_age`, which are all listed in the parameters recipe. `max_age` can be omitted as it has a default value if not specified in the function `flow_file_upload`.
 
-Values below a flow key are passed directly to its Prefect flow. Parameter and deployment
-recipe keys must have one-to-one coverage.
+Note that the recipe keys need to be identical with those in the deployment recipe. The deployment engine will give an error when there are mismatched recipes keys on either one of the recipes.
