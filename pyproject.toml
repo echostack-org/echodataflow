@@ -78,12 +78,8 @@ dev = [
     "pytest-cov",
     # lint
     "black",
-    "check-manifest",
     "isort",
-    "mypy",
-    "numpydoc",
     "pre-commit",
-    "pylint",
     "ruff",
     # docs
     "jupyter-book>=2.0.0",
