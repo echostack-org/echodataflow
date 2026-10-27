@@ -220,6 +220,8 @@ Here, at most one run of `raw2Sv` can be active at a time, and new runs are canc
 
 
 
+
+(recipe-spec_task-runner)=
 ### Task runner
 
 A task runner controls how Prefect tasks execute within a flow run. Currently, `dask` is the only supported task runner (using Prefect's `DaskTaskRunner`). If no task runner is specified, Prefect's default `ThreadPoolTaskRunner` will be used.

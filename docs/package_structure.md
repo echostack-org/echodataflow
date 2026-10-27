@@ -9,36 +9,31 @@ src/echodataflow/
 ├── deployment/    # Recipe parsing, flow registry, CLI, and deployment configuration
 ├── flows/         # Flow functions that are each high-level processing stages
 ├── operations/    # Reusable processing operations, settings, work items, and planning logic
-├── services/      # System services configuration templates
-├── tasks/         # Reusable Prefect task wrappers around operations
-└── utils/         # Shared helpers for files, manifests, ledgers, grids, and time handling
+├── services/      # System services and configuration templates
+├── tasks/         # Task functions that wraps operations
+└── utils/         # Helpers for files, ledgers, time handling, etc
 
-tests/
-├── deployment/    # Recipe validation, registry, CLI, deployment, and runner tests
-├── flow/          # Workflow coordination and flow-level behavior
-├── operations/    # Individual processing operations and planning behavior
-├── tasks/         # Prefect task wrappers
-└── utils/         # Shared helpers, manifests, and processing ledgers
+tests/             # tests organized in a way that mirrors the package structure
+├── deployment/
+├── flow/
+├── operations/
+├── tasks/
+└── utils/
 
-docs/             # User and contributor documentation, plus example YAML recipes
-test_notebooks/   # Notebooks for exploratory and manual checks
-.github/          # Repository automation and contribution configuration
-.agents/          # Implementation context for coding agents
+docs/             # Documemtatopm
+.github/          # GitHub workflows
 ```
 
-The `tasks/` directory provides a **Prefect orchestration layer** around the functions in `operations/`. Operations implement reusable processing behavior; task wrappers expose that behavior to Prefect for logging, retries, and task-run tracking. This separation also lets operations be tested directly without running a complete workflow.
 
-Task boundaries do not have to match operation boundaries. A task can call several operations when they belong in one execution unit, and a flow can combine several tasks into a larger workflow. For example, `flow_classify_backscatter` coordinates separate hake-prediction and nautical area scattering coefficient (NASC) tasks. Some flows also call operations directly when a separate Prefect task is unnecessary.
+Echodataflow uses Prefect to orchestrate the flows, and each flow can include multiple tasks to be executed underneath. The tasks can be executed sequentially or in parallel (see [](recipe-spec_task-runner)), and each task can include multiple operation steps. This design allows easily reusing existing computation either at the operation or the task level.
 
-Because task execution is configured at the flow level, reusable tasks can run under different compatible task runners without rewriting their processing logic. Prefect defaults to `ThreadPoolTaskRunner`; Echodataflow also supports recipe-configured `DaskTaskRunner` for flows that use its environment-based runner configuration. Submitted tasks must still meet the selected runner's requirements, such as serialization for execution in separate processes. See [Recipe specification](recipe_spec.md) for task-runner settings.
 
-Equivalent real-time and post-processing flows share the same module, while reusable planning and manifest logic stays outside flow functions. The flow reference below focuses on the real-time hake pipeline.
 
-Tests mirror the package layers in a separate top-level directory. Files use the `test_*.py` naming convention, and fixtures or stubs stay local unless shared by multiple tests. Run the full suite with `python -m pytest`, or select a layer with, for example, `python -m pytest tests/operations`. See [Tests layout](https://github.com/echostack-org/echodataflow/blob/main/tests/README.md) for more details.
+
 
 ## Available flows
 
-The following subset supports the hake edge-to-cloud pipeline, including simulation of incoming survey data. Modules are listed alphabetically. Post-processing flows and flows specific to other pipelines are omitted.
+The table below lists currently available flows in Echodataflow package. 
 
 | Module in `echodataflow.flows` | [Flow](https://docs.prefect.io/v3/concepts/flows/) | Purpose |
 | --- | --- | --- |
@@ -56,3 +51,10 @@ The following subset supports the hake edge-to-cloud pipeline, including simulat
 | `flows_viz_cloud` | `flow_update_cache_MVBS` | Combine recent cloud MVBS stores into a local cache for echogram visualization. |
 
 Deployment recipes select these flows and configure their parameters, schedules, and execution infrastructure. See [Recipe specification](recipe_spec.md) and [System services](system_services.md) for deployment and service setup.
+
+
+:::{note}
+A subset of the above flows support the edge-to-cloud pipeline that was implemented for Integrated West Coast Pelagics Survey (IWCPS):
+- edge workflows: `flow_raw2Sv`, `flow_create_MVBS`, `flows_classify_backscatter`, and `flow_file_upload`
+- cloud workflows: `flow_ingest_haul`, `flow_ingest_NASC`, `flow_update_grid`, `flow_update_cache_MVBS`, and `flow_update_cache_contours`
+:::
