@@ -3,7 +3,6 @@ import ast
 
 import panel as pn
 import xarray as xr
-from holoviews import opts
 import holoviews as hv
 import echoshader
 import pandas as pd
@@ -29,12 +28,16 @@ def update_cache_multi_freq():
             "WBT 987771-15 ES200-7C_ES",
             "WBT 987769-15 ES333-7C_ES",
         ],
-        vmin=-70,
-        vmax=-36,
-        cmap="viridis",
-        opts=opts.Image(
-            width=1000,
-            height=400,
+        vert_dim="depth",
+    ).opts(
+        hv.opts.Image(
+            cmap="viridis", clim=(-70, -36), colorbar=True,
+            width=1000, height=400,
+            tools=["pan", "box_zoom", "wheel_zoom", "reset"],
+        ),
+        hv.opts.QuadMesh(
+            cmap="viridis", clim=(-70, -36), colorbar=True,
+            width=1000, height=400,
             tools=["pan", "box_zoom", "wheel_zoom", "reset"],
         ),
     )
@@ -70,7 +73,7 @@ def update_cache_tricolor():
     """
     ds_MVBS = xr.open_zarr(path_latest / "latest_MVBS.zarr")
 
-    tricolor = ds_MVBS.eshader.echogram(
+    tricolor = ds_MVBS.eshader.tricolor_echogram(
         channel=[
             "WBT 987753-15 ES120-7C_ES",
             "WBT 987763-15 ES38-7_ES",
@@ -78,12 +81,10 @@ def update_cache_tricolor():
         ],
         vmin=-70,
         vmax=-36,
-        rgb_composite=True,
-        opts=opts.RGB(
-            width=1200,
-            height=600,
-            tools=["pan", "box_zoom", "wheel_zoom", "reset"],
-        ),
+        vert_dim="depth",
+    ).opts(
+        width=1200, height=600,
+        tools=["pan", "box_zoom", "wheel_zoom", "reset"],
     )
     return tricolor
 
@@ -165,7 +166,7 @@ def tricolor_with_contour_app():
     # Create initial plot
     tricolor = update_cache_tricolor()
     contours_hv = create_contours_overlay()
-    tricolor_with_contour = tricolor() * contours_hv
+    tricolor_with_contour = tricolor * contours_hv
     plot_pane = pn.pane.HoloViews(tricolor_with_contour)
 
     # Simple update function that only runs every 10 minutes
