@@ -76,8 +76,6 @@ dev = [
     # tests
     "pytest",
     "pytest-cov",
-    "pytest-xdist",
-    "pytest-mock",
     # lint
     "black",
     "check-manifest",
