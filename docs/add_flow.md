@@ -179,7 +179,7 @@ The `record_timestamps` key must match in both recipes and resolves to the regis
 
 
 
-## 5. Deployment the workflow
+## 5. Deploy the pipeline
 To run this minimum example, spin up a server by running:
 ```shell
 prefect server start
@@ -190,7 +190,7 @@ And start a worker for the pool in a separate terminal:
 prefect worker start --pool local --type process
 ```
 
-From your checkout, create the deployment with the paired recipes:
+Lastly, create the deployment with the paired recipes:
 
 ```shell
 echodataflow-deploy run \
@@ -220,5 +220,3 @@ clock_b,2026-10-27T18:10:02.021147+00:00
 ```
 
 Values reflect actual task execution times, so they need not fall exactly on the scheduled minute or be in timestamp order. If [a local check was run from the earlier step](add-flow_quick-check) you may have two more rows to this file.
-
-

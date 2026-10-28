@@ -33,7 +33,7 @@ Echodataflow uses Prefect to orchestrate the flows, and each flow can include mu
 
 ## Available flows
 
-The table below lists currently available flows in Echodataflow package. Deployment recipes select from these flows and configure their schedules and execution infrastructure (via the [deployment recipe](recipe-spec_deployment)) and parameters (via the [parameters recipe](recipe-spec_parameters)). See [](overview) on how to deploy workflows.
+The table below lists currently available flows in Echodataflow package. Deployment recipes select from these flows and configure their schedules and execution infrastructure (via the [deployment recipe](recipe-spec_deployment)) and parameters (via the [parameters recipe](recipe-spec_parameters)). See [](overview) on how to deploy pipelines, and the [echodataflow-recipes repository]((https://github.com/echostack-org/echodataflow-recipes).) for example recipes.
 
 
 | Module in `echodataflow.flows` | [Flow](https://docs.prefect.io/v3/concepts/flows/) | Purpose |
