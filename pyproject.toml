@@ -59,8 +59,8 @@ dynamic = ["version"]
 [project.optional-dependencies]
 mission = [
     "echopype==0.12.0",
-    "echoshader @ git+https://github.com/echostack-org/echoshader.git@main",
-    "echoregions @ git+https://github.com/echostack-org/echoregions.git",
+    "echoshader==0.2.0",
+    "echoregions==0.2.4",
     "opencv-python",
     "dask-image",
     "torch",
