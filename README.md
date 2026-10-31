@@ -25,7 +25,7 @@ including [how to install](docs/installation.md).
 
 ## Contributors
 
-Echodataflow is currently developed and maintained by by Wu-Jung Lee ([@leewujung](https://github.com/leewujung)) and Lloyd Izard ([@LOCEANlloydizard](https://github.com/LOCEANlloydizard)), with contributions from Caesar Tuguinay ([@ctuguinay](https://github.com/ctuguinay)). The project was initiated by Don Setiawan ([@lsetiawan](https://github.com/lsetiawan)). Soham Butala ([@Sohambutala](https://github.com/Sohambutala)) developed the first version with guidance from Valentina Staneva ([@valentina-s](https://github.com/valentina-s)).
+Echodataflow is currently developed and maintained by Wu-Jung Lee ([@leewujung](https://github.com/leewujung)) and Lloyd Izard ([@LOCEANlloydizard](https://github.com/LOCEANlloydizard)), with contributions from Caesar Tuguinay ([@ctuguinay](https://github.com/ctuguinay)). The project was initiated by Don Setiawan ([@lsetiawan](https://github.com/lsetiawan)). Soham Butala ([@Sohambutala](https://github.com/Sohambutala)) developed the first version with guidance from Valentina Staneva ([@valentina-s](https://github.com/valentina-s)).
 
 
 
