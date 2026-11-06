@@ -6,13 +6,11 @@ from pathlib import Path
 from sqlalchemy import (
     BigInteger,
     Column,
-    Float,
     Index,
     MetaData,
     Table,
     Text,
     create_engine,
-    delete,
     insert,
     select,
     update,
@@ -21,7 +19,6 @@ from sqlalchemy.dialects.postgresql import insert as postgresql_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.sql import func
-
 
 metadata = MetaData()
 
@@ -113,11 +110,13 @@ Index("idx_transects_start_time", transects.c.start_time)
 Index("idx_sv_cps_status", sv_cps.c.status)
 Index("idx_sv_cps_first_ping_time", sv_cps.c.first_ping_time)
 
+
 def _timestamp_string(value) -> str:
     """Return timestamps in a consistent ISO-8601 representation."""
     if hasattr(value, "isoformat"):
         return value.isoformat()
     return str(value)
+
 
 def _zarr_store_mtime_ns(path: str | Path) -> int:
     """Return a stable modification timestamp for a Zarr store."""
@@ -135,6 +134,7 @@ def _zarr_store_mtime_ns(path: str | Path) -> int:
             return metadata_path.stat().st_mtime_ns
 
     return path.stat().st_mtime_ns
+
 
 def _database_url(db_path: str | Path) -> str:
     """Convert a local database path to a SQLAlchemy URL."""
@@ -168,6 +168,7 @@ def _get_engine(database: str) -> Engine:
 def _engine(db_path: str | Path) -> Engine:
     return _get_engine(str(db_path))
 
+
 def resolve_database(
     path_main: str | Path,
     processing_db: str,
@@ -177,6 +178,7 @@ def resolve_database(
         return processing_db
 
     return Path(path_main) / processing_db
+
 
 def initialize_ledger(db_path: str | Path) -> None:
     """Create the processing ledger database and required tables."""
@@ -228,17 +230,13 @@ def register_raw_file(
                 stmt = (
                     postgresql_insert(raw_sv)
                     .values(**values)
-                    .on_conflict_do_nothing(
-                        index_elements=[raw_sv.c.raw_path]
-                    )
+                    .on_conflict_do_nothing(index_elements=[raw_sv.c.raw_path])
                 )
             elif engine.dialect.name == "sqlite":
                 stmt = (
                     sqlite_insert(raw_sv)
                     .values(**values)
-                    .on_conflict_do_nothing(
-                        index_elements=[raw_sv.c.raw_path]
-                    )
+                    .on_conflict_do_nothing(index_elements=[raw_sv.c.raw_path])
                 )
             else:
                 stmt = insert(raw_sv).values(**values)
@@ -257,10 +255,7 @@ def register_raw_file(
                 ).where(raw_sv.c.raw_path == str(raw_path))
             ).one()
 
-        if (
-            existing.file_size != stat.st_size
-            or existing.file_mtime_ns != stat.st_mtime_ns
-        ):
+        if existing.file_size != stat.st_size or existing.file_mtime_ns != stat.st_mtime_ns:
             conn.execute(
                 update(raw_sv)
                 .where(raw_sv.c.raw_path == str(raw_path))
@@ -278,6 +273,7 @@ def register_raw_file(
             return True
 
         return False
+
 
 def get_raw_files_to_process(
     db_path: str | Path,
@@ -382,14 +378,10 @@ def get_completed_sv_files(
     )
 
     if start_time is not None:
-        stmt = stmt.where(
-            raw_sv.c.last_ping_time >= _timestamp_string(start_time)
-        )
+        stmt = stmt.where(raw_sv.c.last_ping_time >= _timestamp_string(start_time))
 
     if end_time is not None:
-        stmt = stmt.where(
-            raw_sv.c.first_ping_time <= _timestamp_string(end_time)
-        )
+        stmt = stmt.where(raw_sv.c.first_ping_time <= _timestamp_string(end_time))
 
     stmt = stmt.order_by(raw_sv.c.first_ping_time)
 
@@ -399,6 +391,7 @@ def get_completed_sv_files(
         rows = conn.execute(stmt).all()
 
     return [row.sv_filename for row in rows]
+
 
 def register_sv_file(
     db_path: str | Path,
@@ -420,9 +413,7 @@ def register_sv_file(
         existing = conn.execute(
             select(
                 sv_cps.c.source_mtime_ns,
-            ).where(
-                sv_cps.c.sv_path == str(sv_path)
-            )
+            ).where(sv_cps.c.sv_path == str(sv_path))
         ).first()
 
         if existing is None:
@@ -437,17 +428,13 @@ def register_sv_file(
                 stmt = (
                     postgresql_insert(sv_cps)
                     .values(**values)
-                    .on_conflict_do_nothing(
-                        index_elements=[sv_cps.c.sv_path]
-                    )
+                    .on_conflict_do_nothing(index_elements=[sv_cps.c.sv_path])
                 )
             elif engine.dialect.name == "sqlite":
                 stmt = (
                     sqlite_insert(sv_cps)
                     .values(**values)
-                    .on_conflict_do_nothing(
-                        index_elements=[sv_cps.c.sv_path]
-                    )
+                    .on_conflict_do_nothing(index_elements=[sv_cps.c.sv_path])
                 )
             else:
                 stmt = insert(sv_cps).values(**values)
@@ -460,17 +447,13 @@ def register_sv_file(
             existing = conn.execute(
                 select(
                     sv_cps.c.source_mtime_ns,
-                ).where(
-                    sv_cps.c.sv_path == str(sv_path)
-                )
+                ).where(sv_cps.c.sv_path == str(sv_path))
             ).one()
 
         if existing.source_mtime_ns != source_mtime_ns:
             conn.execute(
                 update(sv_cps)
-                .where(
-                    sv_cps.c.sv_path == str(sv_path)
-                )
+                .where(sv_cps.c.sv_path == str(sv_path))
                 .values(
                     source_mtime_ns=source_mtime_ns,
                     status="pending",
@@ -493,9 +476,7 @@ def get_sv_files_to_process(
     """Return Sv stores that are pending or failed CPS processing."""
     stmt = (
         select(sv_cps.c.sv_path)
-        .where(
-            sv_cps.c.status.in_(("pending", "failed"))
-        )
+        .where(sv_cps.c.status.in_(("pending", "failed")))
         .order_by(
             sv_cps.c.created_at,
             sv_cps.c.sv_path,
@@ -525,9 +506,7 @@ def mark_sv_cps_processing(
     with engine.begin() as conn:
         conn.execute(
             update(sv_cps)
-            .where(
-                sv_cps.c.sv_path == str(sv_path)
-            )
+            .where(sv_cps.c.sv_path == str(sv_path))
             .values(
                 status="processing",
                 error="",
@@ -551,9 +530,7 @@ def mark_sv_cps_completed(
     with engine.begin() as conn:
         conn.execute(
             update(sv_cps)
-            .where(
-                sv_cps.c.sv_path == str(sv_path)
-            )
+            .where(sv_cps.c.sv_path == str(sv_path))
             .values(
                 status="completed",
                 cps_filename=cps_filename,
@@ -578,9 +555,7 @@ def mark_sv_cps_failed(
     with engine.begin() as conn:
         conn.execute(
             update(sv_cps)
-            .where(
-                sv_cps.c.sv_path == str(sv_path)
-            )
+            .where(sv_cps.c.sv_path == str(sv_path))
             .values(
                 status="failed",
                 error=error,
@@ -595,28 +570,18 @@ def get_completed_cps_files(
     end_time=None,
 ) -> list[str]:
     """Return completed CPS products, optionally overlapping a time range."""
-    stmt = select(
-        sv_cps.c.cps_filename
-    ).where(
+    stmt = select(sv_cps.c.cps_filename).where(
         sv_cps.c.status == "completed",
         sv_cps.c.cps_filename.is_not(None),
     )
 
     if start_time is not None:
-        stmt = stmt.where(
-            sv_cps.c.last_ping_time
-            >= _timestamp_string(start_time)
-        )
+        stmt = stmt.where(sv_cps.c.last_ping_time >= _timestamp_string(start_time))
 
     if end_time is not None:
-        stmt = stmt.where(
-            sv_cps.c.first_ping_time
-            <= _timestamp_string(end_time)
-        )
+        stmt = stmt.where(sv_cps.c.first_ping_time <= _timestamp_string(end_time))
 
-    stmt = stmt.order_by(
-        sv_cps.c.first_ping_time
-    )
+    stmt = stmt.order_by(sv_cps.c.first_ping_time)
 
     engine = _engine(db_path)
 
@@ -624,6 +589,7 @@ def get_completed_cps_files(
         rows = conn.execute(stmt).all()
 
     return [row.cps_filename for row in rows]
+
 
 def register_transect(
     db_path: str | Path,
@@ -640,12 +606,7 @@ def register_transect(
     start_time = _timestamp_string(start_time)
     end_time = _timestamp_string(end_time)
 
-    transect_id = (
-        f"{transect_number}|"
-        f"{transect_part}|"
-        f"{start_time}|"
-        f"{end_time}"
-    )
+    transect_id = f"{transect_number}|" f"{transect_part}|" f"{start_time}|" f"{end_time}"
 
     engine = _engine(db_path)
 
@@ -660,9 +621,7 @@ def register_transect(
 
     with engine.begin() as conn:
         existing = conn.execute(
-            select(transects.c.transect_id).where(
-                transects.c.transect_id == transect_id
-            )
+            select(transects.c.transect_id).where(transects.c.transect_id == transect_id)
         ).first()
 
         if existing is not None:
@@ -672,18 +631,14 @@ def register_transect(
             stmt = (
                 postgresql_insert(transects)
                 .values(**values)
-                .on_conflict_do_nothing(
-                    index_elements=[transects.c.transect_id]
-                )
+                .on_conflict_do_nothing(index_elements=[transects.c.transect_id])
             )
 
         elif engine.dialect.name == "sqlite":
             stmt = (
                 sqlite_insert(transects)
                 .values(**values)
-                .on_conflict_do_nothing(
-                    index_elements=[transects.c.transect_id]
-                )
+                .on_conflict_do_nothing(index_elements=[transects.c.transect_id])
             )
 
         else:
@@ -693,6 +648,7 @@ def register_transect(
 
         return result.rowcount == 1
 
+
 def get_transects_to_process(
     db_path: str | Path,
 ) -> list[dict]:
@@ -700,11 +656,7 @@ def get_transects_to_process(
 
     stmt = (
         select(transects)
-        .where(
-            transects.c.status.in_(
-                ("pending", "incomplete", "failed")
-            )
-        )
+        .where(transects.c.status.in_(("pending", "incomplete", "failed")))
         .order_by(
             transects.c.start_time,
             transects.c.transect_id,
@@ -718,6 +670,7 @@ def get_transects_to_process(
 
     return [dict(row) for row in rows]
 
+
 def get_latest_completed_transect(
     db_path: str | Path,
 ) -> dict | None:
@@ -725,9 +678,7 @@ def get_latest_completed_transect(
 
     stmt = (
         select(transects)
-        .where(
-            transects.c.status == "completed"
-        )
+        .where(transects.c.status == "completed")
         .order_by(
             transects.c.end_time.desc(),
             transects.c.transect_id.desc(),
@@ -745,6 +696,7 @@ def get_latest_completed_transect(
 
     return dict(row)
 
+
 def mark_transect_processing(
     db_path: str | Path,
     transect_id: str,
@@ -756,9 +708,7 @@ def mark_transect_processing(
     with engine.begin() as conn:
         conn.execute(
             update(transects)
-            .where(
-                transects.c.transect_id == transect_id
-            )
+            .where(transects.c.transect_id == transect_id)
             .values(
                 status="processing",
                 error="",
@@ -780,9 +730,7 @@ def mark_transect_completed(
     with engine.begin() as conn:
         conn.execute(
             update(transects)
-            .where(
-                transects.c.transect_id == transect_id
-            )
+            .where(transects.c.transect_id == transect_id)
             .values(
                 status="completed",
                 coverage_start=_timestamp_string(coverage_start),
@@ -809,24 +757,16 @@ def mark_transect_incomplete(
     }
 
     if coverage_start is not None:
-        values["coverage_start"] = _timestamp_string(
-            coverage_start
-        )
+        values["coverage_start"] = _timestamp_string(coverage_start)
 
     if coverage_end is not None:
-        values["coverage_end"] = _timestamp_string(
-            coverage_end
-        )
+        values["coverage_end"] = _timestamp_string(coverage_end)
 
     engine = _engine(db_path)
 
     with engine.begin() as conn:
         conn.execute(
-            update(transects)
-            .where(
-                transects.c.transect_id == transect_id
-            )
-            .values(**values)
+            update(transects).where(transects.c.transect_id == transect_id).values(**values)
         )
 
 
@@ -842,9 +782,7 @@ def mark_transect_failed(
     with engine.begin() as conn:
         conn.execute(
             update(transects)
-            .where(
-                transects.c.transect_id == transect_id
-            )
+            .where(transects.c.transect_id == transect_id)
             .values(
                 status="failed",
                 error=str(error),

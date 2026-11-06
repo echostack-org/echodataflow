@@ -1,24 +1,24 @@
-from os import path
-from pathlib import Path
-import datetime
 import configparser
+import datetime
+import hashlib
+import json
 import tempfile
-
-import pandas as pd
-import numpy as np
-import xarray as xr
-import s3fs
+from contextlib import ExitStack
+from pathlib import Path
 
 import echoregions as er
-
+import numpy as np
+import pandas as pd
+import s3fs
+import xarray as xr
 from prefect import flow, get_run_logger
 
-from echodataflow.utils.utils import get_slice_start_end_times
 from echodataflow.utils.processing_ledger import (
     get_completed_cps_files,
     get_latest_completed_transect,
     resolve_database,
 )
+from echodataflow.utils.utils import get_slice_start_end_times
 
 
 @flow()
@@ -359,7 +359,7 @@ def flow_update_cache_CPS(
     )
 
     if transect is None:
-        print("CPS cache not updated: " "no completed transects found in processing ledger.")
+        print("CPS cache not updated: no completed transects found in processing ledger.")
         return
 
     transect_number = str(transect["transect_part"])
@@ -395,6 +395,39 @@ def flow_update_cache_CPS(
         )
         return
 
+    # Metadata-only input fingerprint: do not rebuild unchanged cache products.
+    output_path = path_cache / file_CPS_zarr
+    marker = output_path / ".revision"
+    sources = []
+    for source in cps_paths:
+        metadata = [
+            source / name for name in (".zmetadata", ".zattrs", ".zgroup", "zarr.json", ".revision")
+        ]
+        sources.append(
+            (
+                source.name,
+                source.stat().st_mtime_ns,
+                [
+                    (
+                        item.name,
+                        item.stat().st_mtime_ns,
+                        hashlib.sha256(item.read_bytes()).hexdigest(),
+                    )
+                    for item in metadata
+                    if item.exists()
+                ],
+            )
+        )
+    revision = hashlib.sha256(
+        json.dumps(
+            [transect_number, transect_start.isoformat(), transect_end.isoformat(), sources],
+            sort_keys=True,
+        ).encode()
+    ).hexdigest()
+    if marker.exists() and marker.read_text(encoding="utf-8") == revision:
+        print("CPS visualization cache is unchanged; skipping rebuild.")
+        return
+
     print(
         f"Building CPS visualization cache for transect "
         f"{transect_number} from {len(cps_paths)} CPS files."
@@ -404,85 +437,76 @@ def flow_update_cache_CPS(
     # Assemble CPS transect from per-file CPS products
     # -----------------------------------------------------
 
-    datasets = [
-        xr.open_zarr(
-            path,
+    with ExitStack() as stack:
+        datasets = [
+            stack.enter_context(xr.open_zarr(path, consolidated=True)) for path in cps_paths
+        ]
+
+        ds_CPS = xr.concat(
+            datasets,
+            dim="ping_time",
+            data_vars="minimal",
+            coords="minimal",
+            compat="override",
+        ).sortby("ping_time")
+
+        # Remove duplicate ping times at file boundaries.
+        _, unique_idx = np.unique(
+            ds_CPS["ping_time"].values,
+            return_index=True,
+        )
+
+        ds_CPS = ds_CPS.isel(ping_time=np.sort(unique_idx))
+
+        # Ledger timestamps are UTC-aware; xarray ping_time is
+        # represented as timezone-naive datetime64.
+        transect_start_naive = transect_start.tz_convert(None)
+
+        transect_end_naive = transect_end.tz_convert(None)
+
+        ds_CPS = ds_CPS.sel(
+            ping_time=slice(
+                transect_start_naive,
+                transect_end_naive,
+            )
+        )
+
+        if ds_CPS.sizes.get("ping_time", 0) == 0:
+            print(
+                f"CPS cache not updated: no pings remain after slicing transect {transect_number}."
+            )
+            return
+
+        # -----------------------------------------------------
+        # Prepare dataset for Echoshader visualization
+        # -----------------------------------------------------
+
+        ds_CPS = _prepare_sv_for_echogram(
+            ds_CPS,
+            var_name="Sv_masked",
+        )
+
+        ds_CPS.attrs.update(
+            {
+                "transect_number": transect_number,
+                "transect_start": str(transect_start_naive),
+                "transect_end": str(transect_end_naive),
+                "source_cps_files": len(cps_paths),
+            }
+        )
+
+        # -----------------------------------------------------
+        # Save visualization cache
+        # -----------------------------------------------------
+
+        output_path = path_cache / file_CPS_zarr
+
+        print(f"Saving transect {transect_number} to CPS visualization cache: {output_path}")
+
+        ds_CPS.chunk({"channel": 1, "ping_time": -1, "echo_range": 4000,}).to_zarr(
+            output_path,
+            mode="w",
             consolidated=True,
         )
-        for path in cps_paths
-    ]
 
-    ds_CPS = xr.concat(
-        datasets,
-        dim="ping_time",
-        data_vars="minimal",
-        coords="minimal",
-        compat="override",
-    ).sortby("ping_time")
-
-    # Remove duplicate ping times at file boundaries.
-    _, unique_idx = np.unique(
-        ds_CPS["ping_time"].values,
-        return_index=True,
-    )
-
-    ds_CPS = ds_CPS.isel(ping_time=np.sort(unique_idx))
-
-    # Ledger timestamps are UTC-aware; xarray ping_time is
-    # represented as timezone-naive datetime64.
-    transect_start_naive = transect_start.tz_convert(None)
-
-    transect_end_naive = transect_end.tz_convert(None)
-
-    ds_CPS = ds_CPS.sel(
-        ping_time=slice(
-            transect_start_naive,
-            transect_end_naive,
-        )
-    )
-
-    if ds_CPS.sizes.get("ping_time", 0) == 0:
-        print(
-            f"CPS cache not updated: no pings remain " f"after slicing transect {transect_number}."
-        )
-        return
-
-    # -----------------------------------------------------
-    # Prepare dataset for Echoshader visualization
-    # -----------------------------------------------------
-
-    ds_CPS = _prepare_sv_for_echogram(
-        ds_CPS,
-        var_name="Sv_masked",
-    )
-
-    ds_CPS.attrs.update(
-        {
-            "transect_number": transect_number,
-            "transect_start": str(transect_start_naive),
-            "transect_end": str(transect_end_naive),
-            "source_cps_files": len(cps_paths),
-        }
-    )
-
-    # -----------------------------------------------------
-    # Save visualization cache
-    # -----------------------------------------------------
-
-    output_path = path_cache / file_CPS_zarr
-
-    print(
-        f"Saving transect " f"{transect_number} " f"to CPS visualization cache: " f"{output_path}"
-    )
-
-    ds_CPS.chunk(
-        {
-            "channel": 1,
-            "ping_time": -1,
-            "echo_range": 4000,
-        }
-    ).to_zarr(
-        output_path,
-        mode="w",
-        consolidated=True,
-    )
+        marker.write_text(revision, encoding="utf-8")

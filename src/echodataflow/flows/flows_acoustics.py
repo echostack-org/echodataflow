@@ -2,26 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 import pandas as pd
-
-from prefect import flow, get_run_logger, get_client
+from prefect import flow, get_client, get_run_logger, runtime
 from prefect.futures import as_completed
 from prefect.states import Failed
-from prefect import runtime
 
 from echodataflow.deployment.task_runners import task_runner_from_environment
-from echodataflow.utils.manifests import (
-    MVBS_COLUMNS_POSTPROCESSING,
-    MVBS_COLUMNS_REALTIME,
-    SV_COLUMNS_REALTIME,
-    SV_COLUMNS_POSTPROCESSING,
-    filter_time_range,
-    read_manifest,
-    write_manifest,
-)
 from echodataflow.operations.operations_acoustics import (
     CreateMVBSResult,
     CreateMVBSSettings,
@@ -34,20 +23,25 @@ from echodataflow.operations.operations_postprocessing import (
     build_MVBS_ledger,
     build_Sv_ledger,
     failure_state,
-    propagate_status,
     plan_mvbs_slices,
     plan_Sv_cleanup,
+    propagate_status,
     read_or_create_ledger,
 )
-
-from echodataflow.tasks.tasks_acoustics import (
-    task_create_MVBS,
-    task_raw2Sv,
+from echodataflow.tasks.tasks_acoustics import task_create_MVBS, task_raw2Sv
+from echodataflow.utils.manifests import (
+    MVBS_COLUMNS_POSTPROCESSING,
+    MVBS_COLUMNS_REALTIME,
+    SV_COLUMNS_POSTPROCESSING,
+    SV_COLUMNS_REALTIME,
+    filter_time_range,
+    read_manifest,
+    write_manifest,
 )
 from echodataflow.utils.utils import (
-    round_up_mins,
-    get_slice_start_end_times,
     extract_datetime_from_filename,
+    get_slice_start_end_times,
+    round_up_mins,
 )
 
 
@@ -345,7 +339,7 @@ async def flow_create_MVBS(
 
         # Create MVBS for this slice
         try:
-            MVBS_filename = f"MVBS_{start_time[snum].strftime("%Y%m%dT%H%M%S")}.zarr"
+            MVBS_filename = f"MVBS_{start_time[snum].strftime('%Y%m%dT%H%M%S')}.zarr"
             result = task_create_MVBS.with_options(
                 task_run_name=MVBS_filename,
                 name=MVBS_filename,

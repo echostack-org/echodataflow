@@ -1,3 +1,5 @@
+import sqlite3
+
 import pandas as pd
 
 from echodataflow.flows import flows_CPS_transect
@@ -6,7 +8,8 @@ from echodataflow.utils.processing_ledger import (
     register_transect,
 )
 
-def test_process_cps_retries_completed_transect_missing_outputs(
+
+def test_pending_transect_without_cps_data_becomes_incomplete(
     monkeypatch,
     tmp_path,
     capsys,
@@ -26,8 +29,7 @@ def test_process_cps_retries_completed_transect_missing_outputs(
         }
     )
 
-    # The transect is already present in the snapshot.
-    # It must still be reconsidered if CPS/NASC outputs are missing.
+    # Selection uses the pending ledger entry, even if a CSV snapshot exists.
     transect.to_csv(transect_csv, index=False)
     transect.to_csv(snapshot_csv, index=False)
 
@@ -74,3 +76,9 @@ def test_process_cps_retries_completed_transect_missing_outputs(
 
     assert len(calls) == 1
     assert "No CPS-ready Sv data for transect_001" in output
+
+    with sqlite3.connect(db_path) as con:
+        row = con.execute("SELECT status, error FROM transects").fetchone()
+    assert row[0] == "incomplete"
+    assert not list((path_main / "CPS_NASC_Zarr").glob("*.zarr"))
+    assert not list((path_main / "CPS_NASC_CSV").glob("*.csv"))
