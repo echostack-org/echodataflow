@@ -15,6 +15,7 @@ project:
         - file: package_structure.md
         - file: add_flow.md
         - file: system_services.md
+        - file: spasso.md
     - title: References
       children:
         - file: prefect_terminology.md

@@ -46,10 +46,12 @@ dependencies = [
     "panel",
     "paramiko",
     "prefect[shell,dask]==3.8.4",
+    "fastapi<0.151",  # Preserve request-body defaults required by Prefect 3.8.4
+    "pyarrow",
     "PyYAML",
     "s3fs",
     "shapely",
-    "sqlalchemy>=2.0",
+    "sqlalchemy>=2.0,<2.1", # BIG problem >= 2.1
     "psycopg[binary]>=3.2",
     "watchdog",
     "xarray",

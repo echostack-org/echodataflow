@@ -106,3 +106,57 @@ def download_spasso_file(
         local_path=str(local_path),
         size_bytes=local_path.stat().st_size,
     )
+
+def download_spasso_asset(url: str, path_main: str) -> list[str]:
+    """Download and extract a public SPASSO ZIP into a local directory."""
+    import shutil
+    import urllib.request
+    import zipfile
+
+    root = Path(path_main)
+    root.mkdir(parents=True, exist_ok=True)
+    archive_path = root / "spasso-products.zip"
+
+    # reuse the downloaded archive on subsequent runs
+    if not archive_path.exists():
+        temporary = archive_path.with_suffix(".part")
+        try:
+            with urllib.request.urlopen(url, timeout=120) as response:
+                with temporary.open("wb") as output:
+                    shutil.copyfileobj(response, output)
+
+            with zipfile.ZipFile(temporary) as archive:
+                if archive.testzip() is not None:
+                    raise ValueError("Invalid SPASSO archive")
+
+            temporary.replace(archive_path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    with zipfile.ZipFile(archive_path) as archive:
+        members = [item for item in archive.infolist() if not item.is_dir()]
+        if not members:
+            raise ValueError("Empty SPASSO archive")
+
+        for item in members:
+            if (
+                "/" in item.filename
+                or "\\" in item.filename
+                or not item.filename.endswith(".nc")
+            ):
+                raise ValueError(f"Unexpected archive entry: {item.filename}")
+
+        for item in members:
+            target = root / item.filename
+            if target.exists() and target.stat().st_size == item.file_size:
+                continue
+
+            temporary = target.with_suffix(".part")
+            try:
+                with archive.open(item) as source, temporary.open("wb") as output:
+                    shutil.copyfileobj(source, output)
+                temporary.replace(target)
+            finally:
+                temporary.unlink(missing_ok=True)
+
+    return [str(root / item.filename) for item in members]

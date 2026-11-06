@@ -9,6 +9,7 @@ from echodataflow.operations.operations_spasso import (
     SpassoRemoteFile,
     download_spasso_file,
     list_spasso_files,
+    download_spasso_asset,
 )
 
 
@@ -36,3 +37,8 @@ def task_download_spasso_file(
         item=item,
         settings=settings,
     )
+
+@task(log_prints=True)
+def task_download_spasso_asset(url: str, path_main: str) -> list[str]:
+    """Download the public SPASSO example bundle."""
+    return download_spasso_asset(url, path_main)

@@ -7,7 +7,7 @@ import xarray as xr
 from prefect import flow
 from prefect_dask import DaskTaskRunner
 
-from echodataflow.flows.cps_helpers import (
+from echodataflow.operations.cps_helpers import (
     _export_nasc_to_echoview_csv,
 )
 from echodataflow.tasks.tasks_acoustics import (
