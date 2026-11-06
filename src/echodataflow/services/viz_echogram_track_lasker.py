@@ -5,6 +5,9 @@ import numpy as np
 import pandas as pd
 import panel as pn
 import xarray as xr
+from echoshader.elements.echogram import echogram, tricolor_echogram
+
+hv.extension("bokeh")
 
 # Configure Panel to prevent automatic refreshes
 pn.config.autoreload = False
@@ -17,7 +20,8 @@ def update_cache_multi_freq():
     Load latest MVBS data and create multi-frequency echograms.
     """
     ds_MVBS = xr.open_zarr(path_latest / "latest_MVBS.zarr")
-    egram = ds_MVBS.eshader.echogram(
+    egram = echogram(
+        ds_MVBS,
         channel=[
             "WBT 987760-15 ES18_ES",
             "WBT 987763-15 ES38-7_ES",
@@ -77,7 +81,8 @@ def update_cache_tricolor():
     """
     ds_MVBS = xr.open_zarr(path_latest / "latest_MVBS.zarr")
 
-    tricolor = ds_MVBS.eshader.tricolor_echogram(
+    tricolor = tricolor_echogram(
+        ds_MVBS,
         channel=[
             "WBT 987753-15 ES120-7C_ES",
             "WBT 987763-15 ES38-7_ES",
