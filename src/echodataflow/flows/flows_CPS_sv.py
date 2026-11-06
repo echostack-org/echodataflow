@@ -1,9 +1,11 @@
 """Select pending Sv products and orchestrate file-level CPS tasks."""
 
 from pathlib import Path
+
 import pandas as pd
 from prefect import flow
 from prefect_dask import DaskTaskRunner
+
 from echodataflow.tasks.tasks_cps import _process_one_sv_cps as task_process_sv_cps
 from echodataflow.utils.processing_ledger import (
     get_sv_files_to_process,
@@ -30,6 +32,8 @@ def flow_process_Sv_CPS(
     fallback_sv_threshold: float = -70,
     new_file_num_limit: int = 10,
     exclude_before: str | None = None,
+    remove_background_noise: bool = True,
+    save_intermediates: bool = True,
 ):
     """Process generic Sv stores into per-file CPS-ready Sv stores."""
     path_main = Path(path_main)
@@ -82,4 +86,6 @@ def flow_process_Sv_CPS(
             seafloor_wphi=seafloor_wphi,
             mask_mode=mask_mode,
             fallback_sv_threshold=fallback_sv_threshold,
+            remove_background_noise=remove_background_noise,
+            save_intermediates=save_intermediates,
         )

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import datetime
+import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -33,6 +35,29 @@ def _iter_s3_keys(s3_client, s3_bucket: str, prefix: str):
             yield obj["Key"]
 
 
+def _batch_progress(path_copy, bucket, endpoint):
+    identity = f"{runtime.deployment.id or 'no_deployment'}\n{bucket}\n{endpoint}"
+    token = hashlib.sha256(identity.encode()).hexdigest()[:16]
+    return Path(path_copy) / f".copy_raw_progress_{token}.json"
+
+
+def _save_batch_progress(path, completed):
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(completed, sort_keys=True), encoding="utf-8")
+    temporary.replace(path)
+
+
+def _completed_local(row, path_copy, completed):
+    key = str(row["s3_path"])
+    expected = row.get("size")
+    if pd.isna(expected):
+        expected = completed.get(key)
+    if expected is None:
+        return False
+    path = Path(path_copy) / Path(key).name
+    return path.is_file() and path.stat().st_size == int(expected)
+
+
 @flow(log_prints=True)
 def flow_copy_raw(
     time_offset_seconds: float = 0.0,
@@ -42,85 +67,91 @@ def flow_copy_raw(
     exclude_before: str | None = None,
     exclude_after: str | None = None,
     endpoint_url: str = "https://sdsc.osn.xsede.org",
+    files_per_run: int | None = None,
 ) -> list[S3CopyResult]:
-    """Copy raw files whose timestamps simulate new realtime arrivals."""
-    print("Copy raw files to simulate data generation")
-    print(f"Executed at {datetime.datetime.now(datetime.UTC)}")
+    """Replay selected S3 RAW files by historical time or by batches.
+
+    With files_per_run unset, preserve the existing timestamp-based replay.
+    With a positive files_per_run, download the next selected files regardless
+    of gaps between acquisition dates. Batch progress is stored beside the RAW
+    files, atomically after each successful download, without Prefect variable
+    size limits. Existing files matching manifest sizes are reused. Keep the
+    source fixed and configure one concurrent run for this deployment.
+    """
+    if files_per_run is not None and (
+        isinstance(files_per_run, bool) or not isinstance(files_per_run, int) or files_per_run < 1
+    ):
+        raise ValueError("files_per_run must be a positive integer or None")
+    if not path_copy:
+        raise ValueError("path_copy is required")
 
     df_raw = pd.read_csv(path_raw_list)
-    # Accept legacy naive values and offset-qualified values in the same file
-    df_raw["timestamp"] = pd.to_datetime(
-        df_raw["timestamp"], format="mixed", utc=True
-    )
-
-    # Set flow execution time to current time - time_offset_seconds
+    df_raw["timestamp"] = pd.to_datetime(df_raw["timestamp"], format="mixed", utc=True)
     flow_time_curr = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
         seconds=time_offset_seconds
     )
-    print(f"Simulated flow run start time: {flow_time_curr}")
+    print(f"Copy RAW files from S3 at {datetime.datetime.now(datetime.UTC)}")
+    completed = {}
+    progress_path = _batch_progress(path_copy, s3_bucket, endpoint_url)
 
-    # Get previous flow execution time from Prefect variable, if it exists
-    flow_time_prev = Variable.get(_var_key(prefix="prev_start_time"), default=None)
-    flow_time_prev = pd.to_datetime(flow_time_prev, utc=True) if flow_time_prev else None
-    print(f"Previous run start time: {flow_time_prev}")
-
-    # Find the last files that would have been generated
-    # between the previous and current flow execution times
-    idx_wanted = df_raw["timestamp"] < flow_time_curr
+    if files_per_run is None:
+        print(f"Simulated acquisition time: {flow_time_curr}")
+        previous = Variable.get(_var_key(prefix="prev_start_time"), default=None)
+        previous = pd.to_datetime(previous, utc=True) if previous else None
+        wanted = df_raw["timestamp"] < flow_time_curr
+        if previous is not None:
+            wanted &= df_raw["timestamp"] > previous
+    else:
+        # A local checkpoint has no Prefect variable size ceiling. The optional
+        # manifest size also recovers successful downloads whose old checkpoint failed.
+        if progress_path.exists():
+            completed = json.loads(progress_path.read_text(encoding="utf-8"))
+            if not isinstance(completed, dict):
+                raise ValueError(f"Invalid batch replay state in {progress_path}")
+        wanted = ~df_raw.apply(lambda row: _completed_local(row, path_copy, completed), axis=1)
 
     if exclude_before is not None:
-        exclude_before_datetime = pd.to_datetime(exclude_before, utc=True)
-        idx_wanted &= df_raw["timestamp"] >= exclude_before_datetime
-
+        wanted &= df_raw["timestamp"] >= pd.to_datetime(exclude_before, utc=True)
     if exclude_after is not None:
-        exclude_after_datetime = pd.to_datetime(exclude_after, utc=True)
-        idx_wanted &= df_raw["timestamp"] < exclude_after_datetime
-
-    if flow_time_prev is not None:
-        idx_wanted &= df_raw["timestamp"] > flow_time_prev
-    df_raw = df_raw[idx_wanted]
-
+        wanted &= df_raw["timestamp"] < pd.to_datetime(exclude_after, utc=True)
+    df_raw = df_raw[wanted]
+    if files_per_run is not None:
+        df_raw = (
+            df_raw.sort_values(["timestamp", "s3_path"])
+            .drop_duplicates("s3_path")
+            .head(files_per_run)
+        )
     if df_raw.empty:
-        print("No new files generated since the last flow execution. Skipping file copy.")
+        print("No RAW files eligible for this run.")
+        if files_per_run is None:
+            Variable.set(
+                _var_key(prefix="prev_start_time"),
+                flow_time_curr.isoformat(),
+                overwrite=True,
+            )
+        return []
 
+    Path(path_copy).mkdir(parents=True, exist_ok=True)
+    settings = S3CopySettings(s3_bucket=s3_bucket, endpoint_url=endpoint_url)
+    results: list[S3CopyResult] = []
+    for value in df_raw["s3_path"]:
+        s3_path = str(value)
+        filename = Path(s3_path).name
+        print(f"Copying {filename} from {s3_bucket} to {path_copy}")
+        result = task_copy_s3_file.with_options(task_run_name=filename, name=filename, retries=3)(
+            S3CopyWorkItem(s3_path=s3_path, local_path=str(Path(path_copy) / filename)),
+            settings,
+        )
+        results.append(result)
+        if files_per_run is not None:
+            completed[s3_path] = (Path(path_copy) / filename).stat().st_size
+            _save_batch_progress(progress_path, completed)
+    if files_per_run is None:
         Variable.set(
             _var_key(prefix="prev_start_time"),
             flow_time_curr.isoformat(),
             overwrite=True,
         )
-
-        return []
-
-    # Setting up task to download
-    settings = S3CopySettings(
-        s3_bucket=s3_bucket,
-        endpoint_url=endpoint_url,
-    )
-
-    results: list[S3CopyResult] = []
-    for s3_path_value in df_raw["s3_path"]:
-        s3_path = str(s3_path_value)
-        filename = Path(s3_path).name
-        print(f"Copying {filename} to {path_copy}")
-        result = task_copy_s3_file.with_options(
-            task_run_name=filename,
-            name=filename,
-            retries=3,
-        )(
-            S3CopyWorkItem(
-                s3_path=s3_path,
-                local_path=str(Path(path_copy) / filename),
-            ),
-            settings,
-        )
-        results.append(result)
-
-    # Store the current flow execution time in a Prefect variable for future reference
-    Variable.set(
-        _var_key(prefix="prev_start_time"),
-        flow_time_curr.isoformat(),
-        overwrite=True,
-    )
     return results
 
 

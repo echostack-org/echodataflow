@@ -3,6 +3,7 @@
 import echopype as ep
 import numpy as np
 import xarray as xr
+
 from .cps_helpers import _dilate_7x7, _pick_channel_by_frequency
 
 
@@ -95,8 +96,13 @@ def correct_background_noise(ds, label):
     )
 
 
-def classify_cps(ds, valid_water_column, mask_mode, fallback_sv_threshold, label):
+def classify_cps(
+    ds, valid_water_column, mask_mode, fallback_sv_threshold, label, use_noise_residual=True
+):
     """Evaluate CPS criteria and retain intermediate masks for inspection.
+
+    use_noise_residual=False bypasses the corrected-minus-original criterion
+    for a demonstration without noise correction; results are not equivalent.
 
     Frequency response dilates Clean Sv directly. The variance operand named
     XxY Mean in the EV template is actually a dB-to-linear conversion, not a
@@ -114,36 +120,38 @@ def classify_cps(ds, valid_water_column, mask_mode, fallback_sv_threshold, label
     def at(da, frequency):
         return da.sel(channel=channels[frequency], drop=True)
 
-    sv = ds.Sv_corrected.where(valid_water_column).transpose(
-        "channel", "ping_time", "range_sample"
-    )
-    def mean(da):
-        return da.rolling(ping_time=3, range_sample=11, center=True,
-                          min_periods=33).mean()
+    # A bypassed correction makes corrected-original residuals identically zero.
+    # Explicitly disable the dependent residual criterion in that case.
+    sv = ds.Sv_corrected.where(valid_water_column).transpose("channel", "ping_time", "range_sample")
 
-    clean_linear = 10 ** (sv / 10)
-    original_linear = 10 ** (ds.Sv.transpose(
-        "channel", "ping_time", "range_sample"
-    ) / 10)
-    ds["variance"] = (clean_linear - original_linear) ** 2
-    ds["variance_smoothed"] = _dilate_7x7(
-        10 * np.log10(np.sqrt(mean(ds["variance"])))
-    )
-    ds["mask_sd120"] = at(ds.variance_smoothed, 120000) > -60
-    ds["mask_sd200"] = at(ds.variance_smoothed, 200000) > -60
+    def mean(da):
+        return da.rolling(ping_time=3, range_sample=11, center=True, min_periods=33).mean()
+
+    if use_noise_residual:
+        clean_linear = 10 ** (sv / 10)
+        original_linear = 10 ** (ds.Sv.transpose("channel", "ping_time", "range_sample") / 10)
+        ds["variance"] = (clean_linear - original_linear) ** 2
+        ds["variance_smoothed"] = _dilate_7x7(10 * np.log10(np.sqrt(mean(ds["variance"]))))
+        ds["mask_sd120"] = at(ds.variance_smoothed, 120000) > -60
+        ds["mask_sd200"] = at(ds.variance_smoothed, 200000) > -60
     ds["Sv_dilated"] = _dilate_7x7(sv)
-    for frequency, low, high in [(70000, -13.85, 9.89),
-                                  (120000, -13.5, 9.37),
-                                  (200000, -13.51, 12.53)]:
+    for frequency, low, high in [
+        (70000, -13.85, 9.89),
+        (120000, -13.5, 9.37),
+        (200000, -13.51, 12.53),
+    ]:
         difference = at(ds.Sv_dilated, frequency) - at(ds.Sv_dilated, 38000)
         name = f"difference_{frequency // 1000}_38"
         ds[name] = difference
         ds[f"mask_frequency{frequency // 1000}"] = (
             np.isfinite(difference) & (difference > low) & (difference < high)
         )
-    ds["mask_frequency"] = (ds.mask_frequency70 & ds.mask_frequency120
-                             & ds.mask_frequency200)
-    ds["mask_sd"] = ds.mask_sd120 & ds.mask_sd200
+    ds["mask_frequency"] = ds.mask_frequency70 & ds.mask_frequency120 & ds.mask_frequency200
+    ds["mask_sd"] = (
+        ds.mask_sd120 & ds.mask_sd200
+        if use_noise_residual
+        else xr.ones_like(valid_water_column, dtype=bool)
+    )
     return ds.mask_frequency & ds.mask_sd & valid_water_column
 
 

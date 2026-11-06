@@ -1,12 +1,10 @@
 from pathlib import Path
-import ast
 
+import holoviews as hv
+import numpy as np
+import pandas as pd
 import panel as pn
 import xarray as xr
-import holoviews as hv
-import echoshader
-import pandas as pd
-import numpy as np
 
 # Configure Panel to prevent automatic refreshes
 pn.config.autoreload = False
@@ -31,13 +29,19 @@ def update_cache_multi_freq():
         vert_dim="depth",
     ).opts(
         hv.opts.Image(
-            cmap="viridis", clim=(-70, -36), colorbar=True,
-            width=1000, height=400,
+            cmap="viridis",
+            clim=(-70, -36),
+            colorbar=True,
+            width=1000,
+            height=400,
             tools=["pan", "box_zoom", "wheel_zoom", "reset"],
         ),
         hv.opts.QuadMesh(
-            cmap="viridis", clim=(-70, -36), colorbar=True,
-            width=1000, height=400,
+            cmap="viridis",
+            clim=(-70, -36),
+            colorbar=True,
+            width=1000,
+            height=400,
             tools=["pan", "box_zoom", "wheel_zoom", "reset"],
         ),
     )
@@ -83,7 +87,8 @@ def update_cache_tricolor():
         vmax=-36,
         vert_dim="depth",
     ).opts(
-        width=1200, height=600,
+        width=1200,
+        height=600,
         tools=["pan", "box_zoom", "wheel_zoom", "reset"],
     )
     return tricolor
@@ -148,10 +153,7 @@ def create_contours_overlay():
                 "depth": depth,
             }
         )
-    contours_hv = hv.Path(
-        hv_paths,
-        kdims=["ping_time", "depth"],
-    ).opts(
+    contours_hv = hv.Path(hv_paths, kdims=["ping_time", "depth"],).opts(
         color="magenta",
         line_width=3,
     )
