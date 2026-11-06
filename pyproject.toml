@@ -51,7 +51,7 @@ dependencies = [
     "PyYAML",
     "s3fs",
     "shapely",
-    "sqlalchemy>=2.0,<2.1", # BIG problem >= 2.1
+    "sqlalchemy>=2.0,<2.1",  # avoid Prefect 3.8.x scheduling incompatibility
     "psycopg[binary]>=3.2",
     "watchdog",
     "xarray",
