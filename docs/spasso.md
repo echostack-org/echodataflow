@@ -1,4 +1,4 @@
-# Satellite data visualization with ship track
+# Visualize satellite data with ship track
 
 <!-- SPASSO workflow: download products and launch the dashboard -->
 

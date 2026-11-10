@@ -1,4 +1,4 @@
-# Coastal pelagic species detection in acoustic data
+# Detect coastal pelagic species in acoustic data
 
 <!-- CPS workflow: replay NCEI RAW data and visualize transects -->
 
