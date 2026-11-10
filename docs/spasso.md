@@ -1,4 +1,6 @@
-# SPASSO workflow: download products and launch the dashboard
+# Satellite data visualization with ship track
+
+<!-- SPASSO workflow: download products and launch the dashboard -->
 
 [SPASSO](https://github.com/OceanCruises/SPASSO) (Software Package for an Adaptive Satellite-based Sampling for Oceanographic cruises) uses satellite-derived ocean products to support adaptive sampling during oceanographic cruises. It provides maps of environmental conditions and computes Eulerian and Lagrangian diagnostics from near-real-time altimetric data to help identify ocean fronts, eddies, and filaments. See [Rousselet et al. (2025), *A Software Package for an Adaptive Satellite-Based Sampling for Oceanographic Cruises (SPASSOv2.0): Tracking Fine-Scale Features for Physical and Biogeochemical Studies*](https://doi.org/10.1175/JTECH-D-24-0071.1).
 
