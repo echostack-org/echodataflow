@@ -1,4 +1,6 @@
-# CPS workflow: replay NCEI RAW data and visualize transects
+# Detect coastal pelagic species in acoustic data
+
+<!-- CPS workflow: replay NCEI RAW data and visualize transects -->
 
 This example replays SH2407 EK80 recordings from the public NCEI bucket `noaa-wcsd-pds`. The `copy_raw` flow downloads selected files into the recipe's `data/raw/` directory. Scheduled flows convert them to Sv, prepare CPS products, assemble transects, and update the Echoshader cache.
 
