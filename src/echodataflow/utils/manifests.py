@@ -27,9 +27,13 @@ SV_COLUMNS_POSTPROCESSING = [
     "raw_filename",
     "Sv_filename",
     "raw2Sv_status",
+    "attempt_count",
     "first_ping_time",
     "last_ping_time",
     "error",
+    "Sv_cleanup_status",
+    "Sv_deleted_at",
+    "Sv_cleanup_error",
 ]
 MVBS_COLUMNS_POSTPROCESSING = [
     "MVBS_filename",
@@ -40,6 +44,7 @@ MVBS_COLUMNS_POSTPROCESSING = [
     "last_ping_time",
     "is_partial",
     "MVBS_status",
+    "attempt_count",
     "error",
 ]
 PREDICTION_COLUMNS_POSTPROCESSING = [
@@ -54,14 +59,25 @@ PREDICTION_COLUMNS_POSTPROCESSING = [
     "first_ping_time",
     "last_ping_time",
     "prediction_status",
+    "attempt_count",
     "error",
 ]
+
+
+def normalize_ledger_dates(df: pd.DataFrame, date_columns: list[str]) -> pd.DataFrame:
+    """Normalize ledger dates in place to UTC with nanosecond storage precision."""
+    for column in date_columns:
+        if column in df:
+            df[column] = pd.to_datetime(df[column], format="mixed", utc=True).astype(
+                "datetime64[ns, UTC]"
+            )
+    return df
 
 
 def read_manifest(path: Path, columns: list[str], date_columns: list[str]) -> pd.DataFrame:
     # Return a schema-correct empty manifest on the first run
     if not path.exists():
-        return pd.DataFrame(columns=columns)
+        return normalize_ledger_dates(pd.DataFrame(columns=columns), date_columns)
     df = pd.read_csv(path, index_col=0)
 
     # Validation: catch missing or unexpected columns
@@ -74,12 +90,26 @@ def read_manifest(path: Path, columns: list[str], date_columns: list[str]) -> pd
         )
     df = df[columns]
 
-    # Set datetime columns to UTC
-    for column in date_columns:
-        if column in df:
-            # Ledger updates can mix legacy naive values with UTC-qualified values
-            df[column] = pd.to_datetime(df[column], format="mixed", utc=True)
-    return df
+    # CSV inference turns an entirely blank text column into float64. Restore
+    # ledger text types before a flow assigns status, filenames, or error text.
+    if columns in (
+        SV_COLUMNS_POSTPROCESSING,
+        MVBS_COLUMNS_POSTPROCESSING,
+        PREDICTION_COLUMNS_POSTPROCESSING,
+    ):
+        text_columns = set(columns) - set(date_columns) - {"attempt_count", "is_partial"}
+        for column in text_columns:
+            df[column] = df[column].astype("string")
+        if "is_partial" in df:
+            df["is_partial"] = df["is_partial"].map(
+                {True: True, False: False, "True": True, "False": False}
+            ).astype("boolean")
+        for column in ("error", "Sv_cleanup_error"):
+            if column in df:
+                df[column] = df[column].fillna("")
+
+    # Ledger updates can mix legacy naive values with UTC-qualified values.
+    return normalize_ledger_dates(df, date_columns)
 
 
 def write_manifest(df: pd.DataFrame, path: Path) -> None:

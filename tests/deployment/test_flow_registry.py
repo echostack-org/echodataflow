@@ -56,18 +56,31 @@ def test_postprocessing_flows_are_registered_with_realtime_modules():
     assert registry.FLOW_REGISTRY["create_MVBS_postprocessing"].entrypoint == (
         "echodataflow/flows/flows_acoustics.py:flow_create_MVBS_postprocessing"
     )
-    assert registry.FLOW_REGISTRY["predict_hake_postprocessing"].entrypoint == (
-        "echodataflow/flows/flows_predict_hake.py:flow_predict_hake_postprocessing"
+    assert registry.FLOW_REGISTRY["classify_backscatter_postprocessing"].entrypoint == (
+        "echodataflow/flows/flows_classify_backscatter.py:flow_classify_backscatter_postprocessing"
     )
 
 
-def test_flow_registry_contains_process_cps_entrypoint():
-    registry = importlib.import_module("echodataflow.deployment.flow_registry")
+def test_flow_registry_contains_process_cps_entrypoints():
+    registry = importlib.import_module(
+        "echodataflow.deployment.flow_registry"
+    )
 
-    registration = registry.FLOW_REGISTRY["process_CPS"]
+    sv_registration = registry.FLOW_REGISTRY[
+        "process_Sv_CPS"
+    ]
+    transect_registration = registry.FLOW_REGISTRY[
+        "process_transect_CPS"
+    ]
 
-    assert registration.entrypoint == (
-        "echodataflow/flows/flows_CPS.py:flow_process_CPS"
+    assert sv_registration.entrypoint == (
+        "echodataflow/flows/flows_CPS_sv.py:"
+        "flow_process_Sv_CPS"
+    )
+
+    assert transect_registration.entrypoint == (
+        "echodataflow/flows/flows_CPS_transect.py:"
+        "flow_process_transect_CPS"
     )
 
 def test_resolve_registered_flows_defaults_to_recipe_key(

@@ -3,7 +3,6 @@ from __future__ import annotations
 import configparser
 from pathlib import Path
 
-import echopype as ep
 import geopandas as gpd
 import pandas as pd
 import s3fs
@@ -23,10 +22,6 @@ from echodataflow.operations.operations_integration import (
 from echodataflow.tasks.tasks_integration import task_read_NASC
 from echodataflow.utils.const import GRID_PARAMS
 from echodataflow.utils.grid import create_boundary_gdf, create_grid_from_bounds
-
-# Turn on verbose logging for echopype
-# otherwise all logging will be muted
-ep.utils.log.verbose()
 
 
 @flow(log_prints=True)

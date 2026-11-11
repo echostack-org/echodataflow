@@ -6,15 +6,16 @@ import json
 import os
 
 from prefect_dask import DaskTaskRunner
+from prefect.task_runners import ThreadPoolTaskRunner
 
 from echodataflow.deployment.core import TASK_RUNNER_ENV_VAR
 
 
-def dask_task_runner_from_environment() -> DaskTaskRunner:
-    """Build the flow's Dask runner when its entrypoint is loaded by a worker."""
+def task_runner_from_environment() -> DaskTaskRunner | ThreadPoolTaskRunner:
+    """Build the configured runner, or use Prefect's default thread pool."""
     serialized = os.getenv(TASK_RUNNER_ENV_VAR)
     if serialized is None:
-        return DaskTaskRunner()
+        return ThreadPoolTaskRunner()
 
     config = json.loads(serialized)
     if config.get("type") != "dask":

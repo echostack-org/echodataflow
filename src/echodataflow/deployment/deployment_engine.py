@@ -13,7 +13,6 @@ from typing import Any, cast
 from prefect.deployments.runner import RunnerDeployment
 from prefect.events import DeploymentEventTrigger
 from prefect.flows import Flow
-from prefect.variables import Variable
 from yaml import safe_load
 
 from echodataflow.deployment.core import (
@@ -531,8 +530,8 @@ def validate_flow_coverage(
         raise ValueError("Flow coverage mismatch. " + " | ".join(errors))
 
 
-def _flow_accepts_time_offset_seconds(flow_obj: Any) -> bool:
-    """Return True when the flow function can accept `time_offset_seconds`.
+def _flow_accepts_parameter(flow_obj: Any, parameter: str) -> bool:
+    """Return True when the flow function accepts the named parameter.
 
     Prefect Flow objects expose the wrapped function via `.fn`. If a flow object
     does not expose an inspectable function (e.g. certain test doubles), we skip
@@ -543,7 +542,7 @@ def _flow_accepts_time_offset_seconds(flow_obj: Any) -> bool:
         return True
 
     signature = inspect.signature(flow_fn)
-    return "time_offset_seconds" in signature.parameters
+    return parameter in signature.parameters
 
 
 def build_deploy_specs(
@@ -570,8 +569,8 @@ def build_deploy_specs(
         flow_info = resolved_flows[key]
 
         # Check if time_offset_seconds is indeed accepted by the flows specified in deploy config
-        if key in time_offset_targets and not _flow_accepts_time_offset_seconds(
-            flow_info["flow_obj"]
+        if key in time_offset_targets and not _flow_accepts_parameter(
+            flow_info["flow_obj"], "time_offset_seconds"
         ):
             raise ValueError(
                 f"deploy_cfg.flows.{key}.inject_time_offset is enabled, "
@@ -605,7 +604,6 @@ def build_deploy_specs(
         deployment_parameters = dict(flow_params)
         if key in time_offset_targets:
             deployment_parameters["time_offset_seconds"] = time_offset_seconds
-
         specs.append(
             DeploymentSpec(
                 flow_key=key,

@@ -21,8 +21,8 @@ FLOW_REGISTRY: dict[str, FlowRegistration] = {
     "create_MVBS": FlowRegistration(
         entrypoint="echodataflow/flows/flows_acoustics.py:flow_create_MVBS",
     ),
-    "predict_hake": FlowRegistration(
-        entrypoint="echodataflow/flows/flows_predict_hake.py:flow_predict_hake",
+    "classify_backscatter": FlowRegistration(
+        entrypoint="echodataflow/flows/flows_classify_backscatter.py:flow_classify_backscatter",
     ),
     "raw2Sv_postprocessing": FlowRegistration(
         entrypoint=(
@@ -38,12 +38,12 @@ FLOW_REGISTRY: dict[str, FlowRegistration] = {
         ),
         description="Create all newly ready historical MVBS slices.",
     ),
-    "predict_hake_postprocessing": FlowRegistration(
+    "classify_backscatter_postprocessing": FlowRegistration(
         entrypoint=(
-            "echodataflow/flows/flows_predict_hake.py:"
-            "flow_predict_hake_postprocessing"
+            "echodataflow/flows/flows_classify_backscatter.py:"
+            "flow_classify_backscatter_postprocessing"
         ),
-        description="Predict all newly ready historical MVBS windows.",
+        description="Classify backscatter in all newly ready historical MVBS windows.",
     ),
     "ingest_haul": FlowRegistration(
         entrypoint="echodataflow/flows/flows_biology.py:flow_ingest_haul",
@@ -63,9 +63,6 @@ FLOW_REGISTRY: dict[str, FlowRegistration] = {
     "copy_trawl": FlowRegistration(
         entrypoint="echodataflow/flows/flows_simulation.py:flow_copy_trawl",
     ),
-    "simulate_transects": FlowRegistration(
-        entrypoint="echodataflow/flows/flows_simulation.py:flow_simulate_transects",
-    ),
     "update_cache_MVBS": FlowRegistration(
         entrypoint="echodataflow/flows/flows_viz_cloud.py:flow_update_cache_MVBS",
     ),
@@ -77,9 +74,25 @@ FLOW_REGISTRY: dict[str, FlowRegistration] = {
         entrypoint="echodataflow/flows/flows_transect.py:flow_transect_update",
         description="Process updates to transect start/end information.",
     ),
-    "process_CPS": FlowRegistration(
-        entrypoint="echodataflow/flows/flows_CPS.py:flow_process_CPS",
-        description="Process CPS acoustic data for new or updated transect segments.",
+    "process_Sv_CPS": FlowRegistration(
+        entrypoint=(
+            "echodataflow/flows/flows_CPS_sv.py:"
+            "flow_process_Sv_CPS"
+        ),
+        description=(
+            "Process generic Sv stores into per-file "
+            "CPS-ready Sv products."
+        ),
+    ),
+    "process_transect_CPS": FlowRegistration(
+        entrypoint=(
+            "echodataflow/flows/flows_CPS_transect.py:"
+            "flow_process_transect_CPS"
+        ),
+        description=(
+            "Assemble CPS-ready Sv products by transect, "
+            "classify CPS targets, and compute NASC."
+        ),
     ),
     "simulate_transects": FlowRegistration(
         entrypoint=(
@@ -87,5 +100,9 @@ FLOW_REGISTRY: dict[str, FlowRegistration] = {
             "flow_simulate_transects"
         ),
         description="Simulate realtime transect updates for testing.",
+    ),
+    "fetch_spasso": FlowRegistration(
+        entrypoint="echodataflow/flows/flows_spasso.py:flow_fetch_spasso",
+        description="Incrementally fetch newly available SPASSO products over SFTP.",
     ),
 }
