@@ -7,14 +7,15 @@ import pandas as pd
 import geopandas as gpd
 import shapely
 
-from bokeh.models import HoverTool
+from bokeh.models import HoverTool, PrintfTickFormatter
+from cartopy import crs as ccrs
 import holoviews as hv
 import geoviews as gv
 import geoviews.tile_sources as gvts
 import panel as pn
 
 
-from viz_core import (
+from echodataflow.services.viz_core import (
     THEME, BIO_VAR_NAME, COLORBAR_LABEL, BIO_VAR_UNIT, BIO_VAR_CLIM
 )
 
@@ -26,7 +27,7 @@ pn.extension()
 
 
 # Path to data files
-path_vm_local = Path("/media/volume/shimada_202506_volume/integration")
+path_vm_local = Path("/Users/wujung/hake_postproc_2025_cloud")
 file_grid = path_vm_local / "grid_cells.geojson"
 file_NASC = path_vm_local / "NASC_all.csv"
 file_length_count = path_vm_local / "length_count_all.csv"
@@ -231,9 +232,10 @@ update_text_grid_app = pn.pane.Markdown(
 )
 
 bio_var_selector_grid_map = pn.widgets.Select(
-    name="Biological estimate to plot",
+    name="Variable to display",
     options=list(BIO_VAR_NAME.keys()),
-    value="NASC"
+    value="NASC",
+    width=200,
 )
 
 # Get all WMTS tile source names
@@ -242,7 +244,8 @@ tile_options = [name for name, obj in gvts.__dict__.items() if isinstance(obj, g
 tile_selector_grid_map = pn.widgets.Select(
     name="Basemap tile source",
     options=tile_options,
-    value="EsriNatGeo"
+    value="EsriNatGeo",
+    width=300,
 )
 
 # Hidden widget for forcing plot refresh
@@ -289,13 +292,14 @@ def plot_grid_map(
         gdf_grids, 
         vdims=[var, f"{var}_label", "area"]
     ).opts(
-        width=900,
+        width=600,
         height=800,
         colorbar=True,
         cmap="viridis",
         clim=var_clim,
         clipping_colors={"NaN": "white"},
-        colorbar_opts={"title": colorbar_label},
+        clabel=f"{colorbar_label} ({var_units})",
+        colorbar_opts={"formatter": PrintfTickFormatter(format="%.1e")},
         line_color="black",
         alpha=0.5,
         labelled=[bio_var],
@@ -315,9 +319,18 @@ def grid_app():
     """
     Application to visualize bio estimate grid cells.
     """
+    selectors = pn.Row(
+        pn.Spacer(sizing_mode="stretch_width"),
+        bio_var_selector_grid_map,
+        tile_selector_grid_map,
+        pn.Spacer(sizing_mode="stretch_width"),
+        width=600,
+    )
     layout = pn.Column(
-        update_text_grid_app, bio_var_selector_grid_map, tile_selector_grid_map, plot_grid_map,
-        sizing_mode="stretch_width"
+        update_text_grid_app,
+        selectors,
+        plot_grid_map,
+        sizing_mode="stretch_width",
     )
 
     def scheduled_update():
@@ -363,9 +376,10 @@ update_text_track_app = pn.pane.Markdown(
 )
 
 bio_var_selector_track_map = pn.widgets.Select(
-    name="Biological estimate to plot",
+    name="Variable to display",
     options=["NASC", "Number density", "Biomass density"],
-    value="NASC"
+    value="NASC",
+    width=200,
 )
 
 # Get all WMTS tile source names
@@ -374,7 +388,8 @@ tile_options = [name for name, obj in gvts.__dict__.items() if isinstance(obj, g
 tile_selector_track_map = pn.widgets.Select(
     name="Basemap tile source",
     options=tile_options,
-    value="EsriOceanBase"
+    value="EsriOceanBase",
+    width=300,
 )
 
 # Hidden widget for forcing plot refresh
@@ -436,13 +451,15 @@ def plot_track_map(
         cmap="Reds",
         clim=var_clim,
         colorbar=True,
+        clabel=f"{colorbar_label} ({var_units})",
+        colorbar_opts={"formatter": PrintfTickFormatter(format="%.1e")},
         size="size",
         alpha=0.5,
-        width=900,
+        width=800,
         height=800,
         tools=["hover"],
-        xlabel="Longitude",
-        ylabel="Latitude",
+        xlabel="Longitude (\u00B0E)",
+        ylabel="Latitude (\u00B0N)",
         title=f"Ship track with {bio_var}",
         hover_tooltips=[
             ('Longitude', '@longitude'),
@@ -458,8 +475,21 @@ def plot_track_map(
         line_width=1
     )
 
+    # Derive latitude extent with padding
+    latitude_padding = 1
+    latitude_min = df_NASC_sel["latitude"].min() - latitude_padding
+    latitude_max = df_NASC_sel["latitude"].max() + latitude_padding
+
+    # WMTS/Bokeh axes use Web Mercator meters, so project latitude degrees first
+    mercator = ccrs.GOOGLE_MERCATOR
+    plate_carree = ccrs.PlateCarree()
+    y_min = mercator.transform_point(0, latitude_min, plate_carree)[1]
+    y_max = mercator.transform_point(0, latitude_max, plate_carree)[1]
+
     # Combine with tilemap
-    overlay = tile * points * track
+    overlay = (tile * points * track).opts(
+        ylim=(y_min, y_max),
+    )
 
     return overlay
 
@@ -468,9 +498,18 @@ def track_app():
     """
     Application to visualize track with NASC bubbles.
     """
+    selectors = pn.Row(
+        pn.Spacer(sizing_mode="stretch_width"),
+        bio_var_selector_track_map,
+        tile_selector_track_map,
+        pn.Spacer(sizing_mode="stretch_width"),
+        width=800,
+    )
     layout = pn.Column(
-        update_text_track_app, bio_var_selector_track_map, tile_selector_track_map, plot_track_map,
-        sizing_mode="stretch_width"
+        update_text_track_app,
+        selectors,
+        plot_track_map,
+        sizing_mode="stretch_width",
     )
 
     def scheduled_update():
