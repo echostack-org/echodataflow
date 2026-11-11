@@ -15,7 +15,7 @@ import geoviews.tile_sources as gvts
 import panel as pn
 
 
-from echodataflow.services.viz_core import (
+from echodataflow.viz.viz_core import (
     THEME, BIO_VAR_NAME, COLORBAR_LABEL, BIO_VAR_UNIT, BIO_VAR_CLIM
 )
 
