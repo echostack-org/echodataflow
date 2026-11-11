@@ -46,11 +46,11 @@ BIO_VAR_NAME = {
 
 # Colorbar title name map
 COLORBAR_LABEL = {
-    "NASC": r'$$\sum \mathrm{NASC}$$',
-    "abundance": r"$$\sum N$$",
-    "biomass": r"$$\sum \mathrm{kg}$$",
-    "number_density": r"$$\overline{N~\mathrm{nmi^2}}$$",
-    "biomass_density": r"$$\overline{\mathrm{kg~nmi^2}}$$",
+    "NASC": "NASC",
+    "abundance": "Abundance",
+    "biomass": "Biomass",
+    "number_density": "Number density",
+    "biomass_density": "Biomass density",
 }
 
 # Variable units map
