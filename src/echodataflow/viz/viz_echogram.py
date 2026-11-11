@@ -12,15 +12,14 @@ hv.extension("bokeh")
 # Configure Panel to prevent automatic refreshes
 pn.config.autoreload = False
 
-config = load_config()
-path_latest = config.cache_dir
+config = load_config("echogram")
 
 
 def update_cache_multi_freq():
     """
     Load latest MVBS data and create multi-frequency echograms.
     """
-    ds_MVBS = xr.open_zarr(path_latest / "latest_MVBS.zarr")
+    ds_MVBS = xr.open_zarr(config.cache_dir / "latest_MVBS.zarr")
     egram = echogram(
         ds_MVBS,
         channel=config.channels,
@@ -54,7 +53,7 @@ def multi_freq_app():
     egram = update_cache_multi_freq()
     plot_pane = pn.pane.HoloViews(egram)
 
-    # Simple update function that only runs every 10 minutes
+    # Refresh at the configured interval
     def scheduled_update():
         try:
             new_egram = update_cache_multi_freq()
@@ -63,8 +62,8 @@ def multi_freq_app():
         except Exception as e:
             print(f"Error during scheduled update: {e}")
 
-    # Add ONLY the 10-minute callback - no other automatic updates
-    pn.state.add_periodic_callback(scheduled_update, period=10 * 60 * 1000)  # Update every 10 mins
+    # Register the periodic refresh callback
+    pn.state.add_periodic_callback(scheduled_update, period=config.refresh_seconds * 1000)
 
     return plot_pane
 
@@ -73,7 +72,7 @@ def update_cache_tricolor():
     """
     Load latest MVBS data and create tricolor echogram.
     """
-    ds_MVBS = xr.open_zarr(path_latest / "latest_MVBS.zarr")
+    ds_MVBS = xr.open_zarr(config.cache_dir / "latest_MVBS.zarr")
 
     tricolor = tricolor_echogram(
         ds_MVBS,
@@ -97,7 +96,7 @@ def tricolor_app():
     tricolor = update_cache_tricolor()
     plot_pane = pn.pane.HoloViews(tricolor)
 
-    # Simple update function that only runs every 10 minutes
+    # Refresh at the configured interval
     def scheduled_update():
         try:
             new_tricolor = update_cache_tricolor()
@@ -106,8 +105,8 @@ def tricolor_app():
         except Exception as e:
             print(f"Error during scheduled update: {e}")
 
-    # Add ONLY the 10-minute callback - no other automatic updates
-    pn.state.add_periodic_callback(scheduled_update, period=10 * 60 * 1000)  # Update every 10 mins
+    # Register the periodic refresh callback
+    pn.state.add_periodic_callback(scheduled_update, period=config.refresh_seconds * 1000)
 
     return plot_pane
 
@@ -117,7 +116,7 @@ def create_contours_overlay():
     Convert hake contours dataframe into HoloViews paths.
     """
 
-    contours_df = pd.read_csv(path_latest / "latest_contours.csv")
+    contours_df = pd.read_csv(config.cache_dir / "latest_contours.csv")
 
     # Convert string representations back to arrays
     contours_df["depth"] = contours_df["depth"].apply(
@@ -166,7 +165,7 @@ def tricolor_with_contour_app():
     tricolor_with_contour = tricolor * contours_hv
     plot_pane = pn.pane.HoloViews(tricolor_with_contour)
 
-    # Simple update function that only runs every 10 minutes
+    # Refresh at the configured interval
     def scheduled_update():
         try:
             new_tricolor = update_cache_tricolor()
@@ -175,8 +174,8 @@ def tricolor_with_contour_app():
         except Exception as e:
             print(f"Error during scheduled update: {e}")
 
-    # Add ONLY the 10-minute callback - no other automatic updates
-    pn.state.add_periodic_callback(scheduled_update, period=10 * 60 * 1000)  # Update every 10 mins
+    # Register the periodic refresh callback
+    pn.state.add_periodic_callback(scheduled_update, period=config.refresh_seconds * 1000)
 
     return plot_pane
 

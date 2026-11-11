@@ -1,5 +1,5 @@
 
-from pathlib import Path
+from echodataflow.viz.config import load_config
 import datetime
 
 import numpy as np
@@ -26,13 +26,13 @@ hv.renderer("bokeh").theme = THEME
 pn.extension()
 
 
-# Path to data files
-path_vm_local = Path("/Users/wujung/hake_postproc_2025_cloud")
-file_grid = path_vm_local / "grid_cells.geojson"
-file_NASC = path_vm_local / "NASC_all.csv"
-file_length_count = path_vm_local / "length_count_all.csv"
-file_specimen = path_vm_local / "specimen_all.csv"
+# Deployment settings and data files
+config = load_config("bio")
+bio_var_clim = {**BIO_VAR_CLIM, **config.color_limits}
 
+for basemap in (config.grid_basemap, config.track_basemap):
+    if not isinstance(getattr(gvts, basemap, None), gvts.WMTS):
+        raise ValueError(f"Unknown basemap tile source: {basemap}")
 
 
 # Define length count app widgets
@@ -50,7 +50,7 @@ def plot_length_count(refresh) -> hv.Overlay:
     Plot length count from all haul catches.
     """
     # Load data
-    df_len_cnt_all = pd.read_csv(file_length_count)
+    df_len_cnt_all = pd.read_csv(config.data_dir / config.length_count_file)
 
     # Define stratum options and colors
     stratum_options = sorted(df_len_cnt_all["stratum"].dropna().unique())
@@ -109,7 +109,7 @@ def length_count_app():
     if not hasattr(doc, "length_count_callback"):
         doc.length_count_callback = pn.state.add_periodic_callback(
             scheduled_update,
-            period=10*60*1000  # Update every 10 mins
+            period=config.refresh_seconds * 1000
         )
         def cleanup(session_context):
             try:
@@ -138,7 +138,7 @@ def plot_length_weight(refresh, axis_scale) -> hv.Layout:
     """
     Plot length vs weight scatter for all strata and sex, with axis scale selector and separate legend for each plot.
     """
-    df_specimen_all = pd.read_csv(file_specimen)
+    df_specimen_all = pd.read_csv(config.data_dir / config.specimen_file)
     stratum_options = sorted(df_specimen_all["stratum"].dropna().unique())
     stratum_colors = hv.Cycle("Category10").values
     stratum_colors = {stratum: stratum_colors[i % len(stratum_colors)] for i, stratum in enumerate(stratum_options)}
@@ -198,7 +198,7 @@ def length_weight_app():
     if not hasattr(doc, "length_weight_callback"):
         doc.length_weight_callback = pn.state.add_periodic_callback(
             scheduled_update,
-            period=10*60*1000  # Update every 10 mins
+            period=config.refresh_seconds * 1000
         )
         def cleanup(session_context):
             try:
@@ -244,7 +244,7 @@ tile_options = [name for name, obj in gvts.__dict__.items() if isinstance(obj, g
 tile_selector_grid_map = pn.widgets.Select(
     name="Basemap tile source",
     options=tile_options,
-    value="EsriNatGeo",
+    value=config.grid_basemap,
     width=300,
 )
 
@@ -262,14 +262,14 @@ def plot_grid_map(
     Plot grid map according to the selected biological variable and tile source.
     """      
     # Load grid file
-    gdf_grids = gpd.read_file(file_grid)
+    gdf_grids = gpd.read_file(config.data_dir / config.grid_file)
     gdf_grids = clean_cells(gdf_grids)
 
     # Get variable attributes
     var = BIO_VAR_NAME.get(bio_var, "biomass")
     var_units = BIO_VAR_UNIT.get(var, "biomass")
     colorbar_label = COLORBAR_LABEL.get(var, "biomass")
-    var_clim = BIO_VAR_CLIM.get(var, "biomass")
+    var_clim = bio_var_clim.get(var, "biomass")
 
     # Get the base tilemap
     tile = getattr(gvts, map_tile)
@@ -354,7 +354,7 @@ def grid_app():
     if not hasattr(doc, "grid_map_callback"):
         doc.grid_map_callback = pn.state.add_periodic_callback(
             scheduled_update,
-            period=10*60*1000  # Update every 10 mins
+            period=config.refresh_seconds * 1000
         )
         def cleanup(session_context):
             try:
@@ -388,7 +388,7 @@ tile_options = [name for name, obj in gvts.__dict__.items() if isinstance(obj, g
 tile_selector_track_map = pn.widgets.Select(
     name="Basemap tile source",
     options=tile_options,
-    value="EsriOceanBase",
+    value=config.track_basemap,
     width=300,
 )
 
@@ -416,7 +416,7 @@ def plot_track_map(
     Plot track map with NASC bubbles according to the selected biological variable and tile source.
     """      
     # Load grid file
-    df_NASC = pd.read_csv(file_NASC, index_col=0)
+    df_NASC = pd.read_csv(config.data_dir / config.nasc_file, index_col=0)
 
     # Filter points with nonzero NASC and format ping_time
     df_NASC_sel = df_NASC[
@@ -429,7 +429,7 @@ def plot_track_map(
 
     # Get variable attributes
     var = BIO_VAR_NAME.get(bio_var, "NASC")
-    var_clim = BIO_VAR_CLIM.get(var, "NASC")
+    var_clim = bio_var_clim.get(var, "NASC")
 
     # Get the base tilemap
     tile = getattr(gvts, map_tile)
@@ -527,7 +527,7 @@ def track_app():
     if not hasattr(doc, "track_map_callback"):
         doc.track_map_callback = pn.state.add_periodic_callback(
             scheduled_update,
-            period=10*60*1000  # Update every 10 mins
+            period=config.refresh_seconds * 1000
         )
         def cleanup(session_context):
             try:
@@ -551,7 +551,7 @@ test_server = pn.serve(
         "length_weight_scatter": length_weight_app,
         "track_map": track_app,
     },
-    port=1804,
+    port=config.port,
     websocket_origin="*",
     admin=True,
     show=False,

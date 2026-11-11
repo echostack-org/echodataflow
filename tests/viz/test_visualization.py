@@ -24,17 +24,17 @@ def test_echograms(monkeypatch, tmp_path):
 
     channels = SHIMADA_CHANNELS
     config_path = tmp_path / "viz.yaml"
-    config_path.write_text(yaml.safe_dump({
+    config_path.write_text(yaml.safe_dump({"echogram": {
         "cache_dir": str(tmp_path),
         "channels": channels,
         "tricolor_channels": [channels[3], channels[1], channels[0]],
         "port": 1809,
-    }))
+    }}))
     monkeypatch.setenv("ECHODATAFLOW_VIZ_CONFIG", str(config_path))
     with patch("panel.serve") as serve:
         viz = importlib.import_module("echodataflow.viz.viz_echogram")
     assert serve.call_args.kwargs["port"] == 1809
-    assert viz.path_latest == tmp_path
+    assert viz.config.cache_dir == tmp_path
 
     rng = np.random.default_rng(42)
 
