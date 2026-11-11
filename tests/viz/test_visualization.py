@@ -7,6 +7,7 @@ from unittest.mock import patch
 import holoviews as hv
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
 
 
@@ -20,11 +21,27 @@ CHANNELS = [
 ]
 
 
-def test_lasker_echograms(monkeypatch):
+SHIMADA_CHANNELS = [
+    "WBT 400141-15 ES18_ES",
+    "WBT 400143-15 ES38B_ES",
+    "WBT 400142-15 ES70-7C_ES",
+    "WBT 400140-15 ES120-7C_ES",
+    "WBT 400145-15 ES200-7C_ES",
+]
+
+
+@pytest.mark.parametrize(
+    "module_name, channels",
+    [
+        ("viz_echogram_track_lasker", CHANNELS),
+        ("viz_echogram_track", SHIMADA_CHANNELS),
+    ],
+)
+def test_echograms(monkeypatch, module_name, channels):
     # Import the real service without starting the Panel server.
     with patch("panel.serve"):
         viz = importlib.import_module(
-            "echodataflow.viz.viz_echogram_track_lasker"
+            f"echodataflow.viz.{module_name}"
         )
 
     rng = np.random.default_rng(42)
@@ -33,11 +50,11 @@ def test_lasker_echograms(monkeypatch):
         {
             "Sv": (
                 ("channel", "ping_time", "depth"),
-                rng.uniform(-90, -30, (6, 20, 30)),
+                rng.uniform(-90, -30, (len(channels), 20, 30)),
             )
         },
         coords={
-            "channel": CHANNELS,
+            "channel": channels,
             "ping_time": pd.date_range(
                 "2026-01-01", periods=20, freq="s"
             ),
