@@ -48,6 +48,7 @@ dependencies = [
     "prefect[shell,dask]==3.8.4",
     "fastapi<0.151",  # Preserve request-body defaults required by Prefect 3.8.4
     "pyarrow",
+    "pydantic>=2,<3",
     "PyYAML",
     "s3fs",
     "shapely",

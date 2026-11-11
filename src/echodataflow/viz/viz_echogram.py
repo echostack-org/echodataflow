@@ -1,4 +1,4 @@
-from pathlib import Path
+from echodataflow.viz.config import load_config
 
 import holoviews as hv
 import numpy as np
@@ -12,7 +12,8 @@ hv.extension("bokeh")
 # Configure Panel to prevent automatic refreshes
 pn.config.autoreload = False
 
-path_latest = Path("/media/volume/shimada_202506_volume/viz_data_cache")
+config = load_config()
+path_latest = config.cache_dir
 
 
 def update_cache_multi_freq():
@@ -22,13 +23,7 @@ def update_cache_multi_freq():
     ds_MVBS = xr.open_zarr(path_latest / "latest_MVBS.zarr")
     egram = echogram(
         ds_MVBS,
-        channel=[
-            "WBT 400141-15 ES18_ES",
-            "WBT 400143-15 ES38B_ES",
-            "WBT 400142-15 ES70-7C_ES",
-            "WBT 400140-15 ES120-7C_ES",
-            "WBT 400145-15 ES200-7C_ES",
-        ],
+        channel=config.channels,
         vert_dim="depth",
     ).opts(
         hv.opts.Image(
@@ -82,11 +77,7 @@ def update_cache_tricolor():
 
     tricolor = tricolor_echogram(
         ds_MVBS,
-        channel=[
-            "WBT 400140-15 ES120-7C_ES",
-            "WBT 400143-15 ES38B_ES",
-            "WBT 400141-15 ES18_ES",
-        ],
+        channel=config.tricolor_channels,
         vmin=-70,
         vmax=-36,
         vert_dim="depth",
@@ -197,7 +188,7 @@ test_server = pn.serve(
         "tricolor_echogram": tricolor_app,
         "tricolor_contour_echogram": tricolor_with_contour_app,
     },
-    port=1802,
+    port=config.port,
     websocket_origin="*",
     admin=True,
     show=False,

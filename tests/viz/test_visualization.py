@@ -7,18 +7,7 @@ from unittest.mock import patch
 import holoviews as hv
 import numpy as np
 import pandas as pd
-import pytest
 import xarray as xr
-
-
-CHANNELS = [
-    "WBT 987760-15 ES18_ES",
-    "WBT 987763-15 ES38-7_ES",
-    "WBT 987766-15 ES70-7C_ES",
-    "WBT 987753-15 ES120-7C_ES",
-    "WBT 987771-15 ES200-7C_ES",
-    "WBT 987769-15 ES333-7C_ES",
-]
 
 
 SHIMADA_CHANNELS = [
@@ -30,19 +19,22 @@ SHIMADA_CHANNELS = [
 ]
 
 
-@pytest.mark.parametrize(
-    "module_name, channels",
-    [
-        ("viz_echogram_track_lasker", CHANNELS),
-        ("viz_echogram_track", SHIMADA_CHANNELS),
-    ],
-)
-def test_echograms(monkeypatch, module_name, channels):
-    # Import the real service without starting the Panel server.
-    with patch("panel.serve"):
-        viz = importlib.import_module(
-            f"echodataflow.viz.{module_name}"
-        )
+def test_echograms(monkeypatch, tmp_path):
+    import yaml
+
+    channels = SHIMADA_CHANNELS
+    config_path = tmp_path / "viz.yaml"
+    config_path.write_text(yaml.safe_dump({
+        "cache_dir": str(tmp_path),
+        "channels": channels,
+        "tricolor_channels": [channels[3], channels[1], channels[0]],
+        "port": 1809,
+    }))
+    monkeypatch.setenv("ECHODATAFLOW_VIZ_CONFIG", str(config_path))
+    with patch("panel.serve") as serve:
+        viz = importlib.import_module("echodataflow.viz.viz_echogram")
+    assert serve.call_args.kwargs["port"] == 1809
+    assert viz.path_latest == tmp_path
 
     rng = np.random.default_rng(42)
 
