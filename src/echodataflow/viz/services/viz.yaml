@@ -1,0 +1,32 @@
+echogram:
+  cache_dir: /media/volume/shimada_202506_volume/viz_data_cache
+  port: 1802
+  refresh_seconds: 600
+  channels:  # channels to show echogram
+    - WBT 400141-15 ES18_ES
+    - WBT 400143-15 ES38B_ES
+    - WBT 400142-15 ES70-7C_ES
+    - WBT 400140-15 ES120-7C_ES
+    - WBT 400145-15 ES200-7C_ES
+  tricolor_channels:  # RGB channel mapping
+    - WBT 400140-15 ES120-7C_ES  # red
+    - WBT 400143-15 ES38B_ES  # green
+    - WBT 400141-15 ES18_ES  # blue
+
+bio:
+  data_dir: /Users/wujung/hake_postproc_2025_cloud
+  grid_file: grid_cells.geojson
+  nasc_file: NASC_all.csv
+  length_count_file: length_count_all.csv
+  specimen_file: specimen_all.csv
+  port: 1804
+  refresh_seconds: 600
+  grid_basemap: EsriNatGeo
+  track_basemap: EsriOceanBase
+  # Optional overrides; omitted variables retain the defaults in viz_core.py.
+  color_limits:
+    NASC: [100, 10000]
+    abundance: [6250, 625000000]
+    biomass: [6250, 625000000]
+    number_density: [10, 1000000]
+    biomass_density: [10, 1000000]
