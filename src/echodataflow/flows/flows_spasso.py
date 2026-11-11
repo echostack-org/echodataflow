@@ -15,6 +15,7 @@ from echodataflow.operations.operations_spasso import (
     SpassoDownloadSettings,
 )
 from echodataflow.tasks.tasks_spasso import (
+    task_download_spasso_asset,
     task_download_spasso_file,
     task_list_spasso_files,
 )
@@ -22,7 +23,7 @@ from echodataflow.tasks.tasks_spasso import (
 
 @flow(log_prints=True, task_runner=task_runner_from_environment())
 def flow_fetch_spasso(
-    host: str,
+    host: str = "",
     port: int = 2221,
     remote_path: str = "",
     path_main: str = "",
@@ -31,10 +32,25 @@ def flow_fetch_spasso(
     password_secret: str = "spasso-password",
     task_retries: int = 3,
     task_retry_delay_seconds: int = 30,
+    asset_url: str | None = None,
 ) -> None:
     """Download the latest available SPASSO file for each requested product."""
 
     logger = get_run_logger()
+
+    if asset_url:
+        if not path_main:
+            raise ValueError("path_main must be provided")
+
+        files = task_download_spasso_asset.with_options(
+            retries=task_retries,
+            retry_delay_seconds=task_retry_delay_seconds,
+        )(asset_url, path_main)
+
+        logger.info("SPASSO: %d files available in %s", len(files), path_main)
+        return
+
+    # if not continues for secrets
 
     # Credentials
     username = Secret.load(username_secret).get()

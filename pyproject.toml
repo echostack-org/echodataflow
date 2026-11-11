@@ -46,10 +46,12 @@ dependencies = [
     "panel",
     "paramiko",
     "prefect[shell,dask]==3.8.4",
+    "fastapi<0.151",  # Preserve request-body defaults required by Prefect 3.8.4
+    "pyarrow",
     "PyYAML",
     "s3fs",
     "shapely",
-    "sqlalchemy>=2.0",
+    "sqlalchemy>=2.0,<2.1",  # avoid Prefect 3.8.x scheduling incompatibility
     "psycopg[binary]>=3.2",
     "watchdog",
     "xarray",
@@ -59,8 +61,8 @@ dynamic = ["version"]
 [project.optional-dependencies]
 mission = [
     "echopype==0.12.0",
-    "echoshader @ git+https://github.com/echostack-org/echoshader.git@main",
-    "echoregions @ git+https://github.com/echostack-org/echoregions.git",
+    "echoshader==0.2.1",
+    "echoregions==0.2.4",
     "opencv-python",
     "dask-image",
     "torch",

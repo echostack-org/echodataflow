@@ -1,12 +1,13 @@
 from pathlib import Path
-import ast
 
+import holoviews as hv
+import numpy as np
+import pandas as pd
 import panel as pn
 import xarray as xr
-import holoviews as hv
-import echoshader
-import pandas as pd
-import numpy as np
+from echoshader.elements.echogram import echogram, tricolor_echogram
+
+hv.extension("bokeh")
 
 # Configure Panel to prevent automatic refreshes
 pn.config.autoreload = False
@@ -19,7 +20,8 @@ def update_cache_multi_freq():
     Load latest MVBS data and create multi-frequency echograms.
     """
     ds_MVBS = xr.open_zarr(path_latest / "latest_MVBS.zarr")
-    egram = ds_MVBS.eshader.echogram(
+    egram = echogram(
+        ds_MVBS,
         channel=[
             "WBT 987760-15 ES18_ES",
             "WBT 987763-15 ES38-7_ES",
@@ -31,13 +33,19 @@ def update_cache_multi_freq():
         vert_dim="depth",
     ).opts(
         hv.opts.Image(
-            cmap="viridis", clim=(-70, -36), colorbar=True,
-            width=1000, height=400,
+            cmap="viridis",
+            clim=(-70, -36),
+            colorbar=True,
+            width=1000,
+            height=400,
             tools=["pan", "box_zoom", "wheel_zoom", "reset"],
         ),
         hv.opts.QuadMesh(
-            cmap="viridis", clim=(-70, -36), colorbar=True,
-            width=1000, height=400,
+            cmap="viridis",
+            clim=(-70, -36),
+            colorbar=True,
+            width=1000,
+            height=400,
             tools=["pan", "box_zoom", "wheel_zoom", "reset"],
         ),
     )
@@ -73,7 +81,8 @@ def update_cache_tricolor():
     """
     ds_MVBS = xr.open_zarr(path_latest / "latest_MVBS.zarr")
 
-    tricolor = ds_MVBS.eshader.tricolor_echogram(
+    tricolor = tricolor_echogram(
+        ds_MVBS,
         channel=[
             "WBT 987753-15 ES120-7C_ES",
             "WBT 987763-15 ES38-7_ES",
@@ -83,7 +92,8 @@ def update_cache_tricolor():
         vmax=-36,
         vert_dim="depth",
     ).opts(
-        width=1200, height=600,
+        width=1200,
+        height=600,
         tools=["pan", "box_zoom", "wheel_zoom", "reset"],
     )
     return tricolor
@@ -148,10 +158,7 @@ def create_contours_overlay():
                 "depth": depth,
             }
         )
-    contours_hv = hv.Path(
-        hv_paths,
-        kdims=["ping_time", "depth"],
-    ).opts(
+    contours_hv = hv.Path(hv_paths, kdims=["ping_time", "depth"],).opts(
         color="magenta",
         line_width=3,
     )
