@@ -69,10 +69,6 @@ mission = [
     "torch",
 ]
 
-inference = [
-    "segmentation-inference @ git+https://github.com/uw-echospace/segmentation_inference.git",
-]
-
 dev = [
     # notebooks
     "ipykernel",
