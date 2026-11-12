@@ -1,5 +1,21 @@
 # Echodataflow
 
+<div align="center">
+  <!-- <a href="https://echodataflow.readthedocs.io/en/latest/?badge=latest">
+    <img src="https://readthedocs.org/projects/echodataflow/badge/?version=latest" alt="docs"/>
+  </a> -->
+  <a href="https://codecov.io/gh/echostack-org/echodataflow">
+    <img src="https://codecov.io/gh/echostack-org/echodataflow/graph/badge.svg?token=YTMVVHG585" alt="codecov"/>
+  </a>
+  <a href="https://www.prefect.io/">
+    <img src="https://img.shields.io/badge/orchestration-Prefect-blue?logo=prefect&logoColor=white" alt="Prefect"/>
+  </a>
+  <a href="https://scientific-python.org/specs/spec-0000/">
+    <img src="https://img.shields.io/badge/SPEC-0-green?labelColor=%23004811&color=%235CA038" alt="SPEC 0"/>
+  </a>
+</div>
+
+
 Echodataflow provides recipe-driven orchestration for echosounder data processing workflows.
 It combines [Prefect](https://www.prefect.io/), YAML deployment recipes, and tools
 such as [Echopype](https://github.com/echostack-org/echopype) to run workflows on different
