@@ -16,6 +16,7 @@ project:
         - file: add_flow.md
         - file: system_services.md
     - title: Pipeline examples
+      file: pipeline_examples.md
       children:
         - file: cps.md
         - file: hake_edge2cloud.md

@@ -33,7 +33,7 @@ Echodataflow `v0.2.0` is currently under development and has not been released, 
 ### Instal as an installed package
 To run Echodataflow as an installed package, install it directly from the repository:
 ```shell
-uv pip install "echodataflow[dev,mission,inference] @ git+https://github.com/echostack-org/echodataflow.git"
+uv pip install "echodataflow[dev,mission] @ git+https://github.com/echostack-org/echodataflow.git"
 ```
 
 ### Install for development
@@ -47,15 +47,22 @@ git clone https://github.com/echostack-org/echodataflow.git
 cd echodataflow
 
 # install in editable mode from the local repo
-uv pip install -e ".[dev,mission,inference]"
+uv pip install -e ".[dev,mission]"
 ```
 
-Adding `[dev,mission,inference]` in the `uv pip install` command above
-install the full suite of dependencies specified in `pyproject.toml`:
+Adding `[dev,mission]` in the `uv pip install` commands above
+installs the optional dependencies specified in `pyproject.toml`:
 - `dev`: testing, linting, code quality, documentation tools, and Jupyter kernel support.
 - `mission`: mission-specific dependencies for the example pipelines.
-- `inference`: the hake segmentation model, needed for running the `classify_backscatter` flow.
 
+
+:::{note}
+To run the `classify_backscatter` flow, also install the hake segmentation model
+package separately in the same environment:
+```shell
+uv pip install "segmentation-inference @ git+https://github.com/uw-echospace/segmentation_inference.git"
+```
+:::
 
 
 

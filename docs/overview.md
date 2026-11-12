@@ -7,6 +7,7 @@ Echodataflow executes echosounder data processing pipelines by following the "re
 
 
 
+(overview_recipes)=
 ## Recipes
 
 Each data processing pipeline is defined by a pair of recipes: the "deployment" and "parameters" recipes. The recipes are organized around the concept of "flow," whcih is the central container of workflow logic in Prefect.
@@ -21,11 +22,8 @@ The flows currently available in the Echodataflow package were developed to supp
 
 
 
-
-## Orchestration server and computing infrastructure
-
-
-### Local deployment setup
+(overview_local-setup)=
+## Local deployment setup
 To deploy a pipeline on a local computere, we need a local Prefect server and workers in work pools:
 - The [server](https://docs.prefect.io/v3/concepts/server) orchestrates the execution of flows and provides visibility into the status of each flow run
 - The [work pools](https://docs.prefect.io/v3/concepts/work-pools) connect the orchestrated operations to the computing infrastructure where flows run.
@@ -64,9 +62,8 @@ For operational deployments from a local server, these can be run via system ser
 
 
 
-
-
-### Use Prefect Cloud
+(overview_prefect-cloud)=
+## Use Prefect Cloud
 It is also possible to use Prefect Cloud to orchestrate flow executions without running a local Prefect server. Below we show the steps to authenticate with Prefect Cloud and start a worker locally that Prefect Cloud can orchestrate.
 
 1. To authenticate and select the workspace that will receive your deployments, run:

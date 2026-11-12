@@ -9,16 +9,19 @@ src/echodataflow/
 ├── deployment/    # Recipe parsing, flow registry, CLI, and deployment configuration
 ├── flows/         # Flow functions that are each high-level processing stages
 ├── operations/    # Reusable processing operations, settings, work items, and planning logic
-├── services/      # System services and configuration templates
+├── services/      # Infrastructure system service and configuration templates
 ├── tasks/         # Task functions that wraps operations
-└── utils/         # Helpers for files, ledgers, time handling, etc
+├── utils/         # Helpers for files, ledgers, time handling, etc
+└── viz/           # Visualization applications
+    └── services/  # Visualization system service templates
 
 tests/             # tests organized in a way that mirrors the package structure
 ├── deployment/
 ├── flow/
 ├── operations/
 ├── tasks/
-└── utils/
+├── utils/
+└── viz/
 
 docs/             # Documemtatopm
 .github/          # GitHub workflows
