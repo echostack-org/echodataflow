@@ -1,7 +1,7 @@
 import pandas as pd
 
 import echodataflow.flows.flows_acoustics as flows_acoustics
-import echodataflow.flows.flows_predict_hake as flows_predict_hake
+import echodataflow.flows.flows_classify_backscatter as flows_classify_backscatter
 
 from echodataflow.operations.operations_postprocessing import build_MVBS_ledger, build_Sv_ledger
 from echodataflow.utils.manifests import write_manifest
@@ -10,7 +10,7 @@ from echodataflow.flows.flows_acoustics import (
     flow_create_MVBS_postprocessing,
     flow_raw2Sv_postprocessing,
 )
-from echodataflow.flows.flows_predict_hake import flow_predict_hake_postprocessing
+from echodataflow.flows.flows_classify_backscatter import flow_classify_backscatter_postprocessing
 
 
 def test_mvbs_flow_skips_when_sv_ledger_does_not_exist(tmp_path, monkeypatch):
@@ -34,8 +34,8 @@ def test_prediction_flow_skips_when_mvbs_ledger_does_not_exist(tmp_path, monkeyp
         def info(self, message):
             messages.append(message)
 
-    monkeypatch.setattr(flows_predict_hake, "get_run_logger", lambda: Logger())
-    flow_predict_hake_postprocessing.fn(
+    monkeypatch.setattr(flows_classify_backscatter, "get_run_logger", lambda: Logger())
+    flow_classify_backscatter_postprocessing.fn(
         path_main=str(tmp_path),
         path_weight="unused.ckpt",
     )
@@ -116,20 +116,20 @@ def test_prediction_postprocessing_applies_new_file_num_limit(tmp_path, monkeypa
         def info(self, message):
             messages.append(message)
 
-    monkeypatch.setattr(flows_predict_hake, "get_run_logger", lambda: Logger())
-    monkeypatch.setattr(flows_predict_hake, "read_manifest", lambda *_, **__: pd.DataFrame())
+    monkeypatch.setattr(flows_classify_backscatter, "get_run_logger", lambda: Logger())
+    monkeypatch.setattr(flows_classify_backscatter, "read_manifest", lambda *_, **__: pd.DataFrame())
     monkeypatch.setattr(
-        flows_predict_hake,
+        flows_classify_backscatter,
         "read_or_create_ledger",
         lambda **_: pd.DataFrame(),
     )
     monkeypatch.setattr(
-        flows_predict_hake,
+        flows_classify_backscatter,
         "plan_prediction_slices",
         lambda *_: [object()],
     )
 
-    flow_predict_hake_postprocessing.fn(
+    flow_classify_backscatter_postprocessing.fn(
         path_main=str(tmp_path),
         path_weight="unused.ckpt",
         new_file_num_limit=0,

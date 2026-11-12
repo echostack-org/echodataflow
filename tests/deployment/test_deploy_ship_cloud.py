@@ -206,20 +206,20 @@ def test_deploy_cli_ship_characterization(monkeypatch, tmp_path, install_prefect
     flows_acoustics = types.ModuleType("flows_acoustics")
     flows_acoustics.flow_raw2Sv = FakeFlow("flow_raw2Sv", sink)
     flows_acoustics.flow_create_MVBS = FakeFlow("flow_create_MVBS", sink)
-    flows_predict_hake = types.ModuleType("flows_predict_hake")
-    flows_predict_hake.flow_predict_hake = FakeFlow("flow_predict_hake", sink)
+    flows_classify_backscatter = types.ModuleType("flows_classify_backscatter")
+    flows_classify_backscatter.flow_classify_backscatter = FakeFlow("flow_classify_backscatter", sink)
 
     flows_helper_mod = types.ModuleType("flows_helper")
     flows_helper_mod.flow_file_upload = FakeFlow("flow_file_upload", sink)
 
     monkeypatch.setitem(sys.modules, "flows_acoustics", flows_acoustics)
-    monkeypatch.setitem(sys.modules, "flows_predict_hake", flows_predict_hake)
+    monkeypatch.setitem(sys.modules, "flows_classify_backscatter", flows_classify_backscatter)
     monkeypatch.setitem(sys.modules, "flows_helper", flows_helper_mod)
     monkeypatch.setitem(sys.modules, "echodataflow.flows.flows_acoustics", flows_acoustics)
     monkeypatch.setitem(
         sys.modules,
-        "echodataflow.flows.flows_predict_hake",
-        flows_predict_hake,
+        "echodataflow.flows.flows_classify_backscatter",
+        flows_classify_backscatter,
     )
     monkeypatch.setitem(sys.modules, "echodataflow.flows.flows_helper", flows_helper_mod)
 
@@ -227,7 +227,7 @@ def test_deploy_cli_ship_characterization(monkeypatch, tmp_path, install_prefect
         "flows": {
             "raw2Sv": {"a": 1},
             "create_MVBS": {"b": 2},
-            "predict_hake": {"c": 3},
+            "classify_backscatter": {"c": 3},
             "file_upload_acoustics": {"d": 4},
             "file_upload_trawl": {"e": 5},
         },
@@ -246,8 +246,8 @@ def test_deploy_cli_ship_characterization(monkeypatch, tmp_path, install_prefect
                 "cron_offset": 3,
                 "inject_time_offset": True,
             },
-            "predict_hake": {
-                "deployment_name": "predict-hake_leg2",
+            "classify_backscatter": {
+                "deployment_name": "classify-backscatter_leg2",
                 "interval": 20,
                 "inject_time_offset": True,
             },
@@ -286,7 +286,7 @@ def test_deploy_cli_ship_characterization(monkeypatch, tmp_path, install_prefect
     ship_modules = {
         "raw2Sv": "flows_acoustics",
         "create_MVBS": "flows_acoustics",
-        "predict_hake": "flows_predict_hake",
+        "classify_backscatter": "flows_classify_backscatter",
         "file_upload_acoustics": "flows_helper",
         "file_upload_trawl": "flows_helper",
     }
@@ -313,7 +313,7 @@ def test_deploy_cli_ship_characterization(monkeypatch, tmp_path, install_prefect
     expected_entrypoints = {
         "raw2Sv": "echodataflow/flows/flows_acoustics.py:flow_raw2Sv",
         "create_MVBS": "echodataflow/flows/flows_acoustics.py:flow_create_MVBS",
-        "predict_hake": "echodataflow/flows/flows_predict_hake.py:flow_predict_hake",
+        "classify_backscatter": "echodataflow/flows/flows_classify_backscatter.py:flow_classify_backscatter",
         "file_upload": "echodataflow/flows/flows_helper.py:flow_file_upload",
     }
     actual_entrypoints = {

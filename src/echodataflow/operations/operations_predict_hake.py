@@ -148,11 +148,8 @@ def predict_hake(
 
     # Save to evr
     evr_filename = f"prediction_{item.filename_postfix}.evr"
-    er.write_evr(
-        Path(settings.directory_evr) / evr_filename,
-        da_predict_hake,
-        region_classification="hake",
-    )
+    regions2d = er.read_mask(da_predict_hake, region_classification="hake")
+    regions2d.to_evr(Path(settings.directory_evr) / evr_filename)
 
     return PredictHakeResult(
         mvbs_dataset=ds_MVBS_combine,

@@ -76,6 +76,14 @@ class FakeNASCDataset:
         self.saved = kwargs
 
 
+class FakeRegions2D:
+    def __init__(self, evr_call):
+        self.evr_call = evr_call
+
+    def to_evr(self, path):
+        self.evr_call["path"] = path
+
+
 def test_predict_hake_result_chains_into_compute_NASC(monkeypatch, tmp_path):
     combined = FakeCombinedDataset()
     model = FakeModel()
@@ -101,14 +109,14 @@ def test_predict_hake_result_chains_into_compute_NASC(monkeypatch, tmp_path):
 
     monkeypatch.setattr(operations_predict_hake.xr, "DataArray", fake_data_array)
 
-    def fake_write_evr(path, prediction, region_classification):
+    def fake_read_mask(prediction, region_classification):
         evr_call.update(
-            path=path,
             prediction=prediction,
             region_classification=region_classification,
         )
+        return FakeRegions2D(evr_call)
 
-    monkeypatch.setattr(operations_predict_hake.er, "write_evr", fake_write_evr)
+    monkeypatch.setattr(operations_predict_hake.er, "read_mask", fake_read_mask)
 
     prediction_result = operations_predict_hake.predict_hake(
         operations_predict_hake.PredictHakeWorkItem(

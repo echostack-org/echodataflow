@@ -10,7 +10,7 @@ build-backend = 'setuptools.build_meta'
 name = "echodataflow"
 description = "Echosounder data processing pipeline orchestration"
 readme = { file = "README.md", content-type = "text/markdown" }
-requires-python = ">=3.12"
+requires-python = ">=3.13, <3.15"
 license = { text = "Apache-2.0" }
 authors = [
     { name = "Wu-Jung Lee", email = "leewujung@gmail.com" },
@@ -26,7 +26,8 @@ classifiers = [
     "Topic :: Software Development :: Build Tools",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering",
 ]
@@ -45,10 +46,13 @@ dependencies = [
     "panel",
     "paramiko",
     "prefect[shell,dask]==3.8.4",
+    "fastapi<0.151",  # Preserve request-body defaults required by Prefect 3.8.4
+    "pyarrow",
+    "pydantic>=2,<3",
     "PyYAML",
     "s3fs",
     "shapely",
-    "sqlalchemy>=2.0",
+    "sqlalchemy>=2.0,<2.1",  # avoid Prefect 3.8.x scheduling incompatibility
     "psycopg[binary]>=3.2",
     "watchdog",
     "xarray",
@@ -57,43 +61,27 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 mission = [
-    "echopype @ git+https://github.com/echostack-org/echopype.git",
-    "echoshader @ git+https://github.com/echostack-org/echoshader.git",
-    "echoregions @ git+https://github.com/echostack-org/echoregions.git",
+    "echopype==0.12.0",
+    "echoshader==0.2.1",
+    "echoregions==0.2.4",
     "opencv-python",
     "dask-image",
     "torch",
 ]
 
-notebook = [
+dev = [
+    # notebooks
     "ipykernel",
-]
-
-test = [
+    # tests
     "pytest",
     "pytest-cov",
-    "pytest-xdist",
-    "pytest-mock",
-]
-
-lint = [
+    # lint
     "black",
-    "check-manifest",
     "isort",
-    "mypy",
-    "numpydoc",
     "pre-commit",
-    "pylint",
     "ruff",
-]
-
-docs = [
-    "jupyter-book",
-    "matplotlib",
-    "nbsphinx",
-    "recommonmark",
-    "sphinx",
-    "sphinx-automodapi",
+    # docs
+    "jupyter-book>=2.0.0",
 ]
 
 [project.scripts]
@@ -118,6 +106,7 @@ line-length = 100
 
 [tool.ruff]
 line-length = 100
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]

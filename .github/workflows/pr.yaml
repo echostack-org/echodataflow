@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.13", "3.14"]
 
     steps:
       - name: Checkout repository
@@ -34,10 +34,9 @@ jobs:
       - name: Install package and test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[test,mission]"
+          python -m pip install -e ".[dev,mission]"
+          python -m pip install "segmentation-inference @ git+https://github.com/uw-echospace/segmentation_inference.git"
 
       - name: Run tests
         run: |
-          python -m pytest -vv \
-            --ignore=tests/operations/test_operations_predict_hake.py \
-            --ignore=tests/flow/test_postprocessing_flow_validation.py
+          python -m pytest -vv
