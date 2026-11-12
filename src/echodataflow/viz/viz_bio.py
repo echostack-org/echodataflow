@@ -429,6 +429,8 @@ def plot_track_map(
 
     # Get variable attributes
     var = BIO_VAR_NAME.get(bio_var, "NASC")
+    var_units = BIO_VAR_UNIT.get(var, "NASC")
+    colorbar_label = COLORBAR_LABEL.get(var, "NASC")
     var_clim = bio_var_clim.get(var, "NASC")
 
     # Get the base tilemap
