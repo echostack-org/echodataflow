@@ -24,10 +24,22 @@ class EchogramConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     cache_dir: DirectoryPath
+    mvbs_file: Path = Path("latest_MVBS.zarr")
+    contours_file: Path = Path("latest_contours.csv")
+    vertical_dimension: ChannelID = "depth"
+    color_limits: tuple[float, float] = (-70, -36)
     channels: Annotated[list[ChannelID], Field(min_length=1)]
     tricolor_channels: Annotated[list[ChannelID], Field(min_length=3, max_length=3)]
     port: Annotated[int, Field(strict=True, ge=1, le=65535)] = 1802
     refresh_seconds: Annotated[int, Field(strict=True, gt=0)] = 600
+
+    @field_validator("color_limits")
+    @classmethod
+    def check_color_limits(cls, limits: tuple[float, float]) -> tuple[float, float]:
+        lower, upper = limits
+        if not -float("inf") < lower < upper < float("inf"):
+            raise ValueError("Color limits must be finite and increasing")
+        return limits
 
     @field_validator("channels", "tricolor_channels")
     @classmethod

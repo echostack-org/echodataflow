@@ -19,15 +19,15 @@ def update_cache_multi_freq():
     """
     Load latest MVBS data and create multi-frequency echograms.
     """
-    ds_MVBS = xr.open_zarr(config.cache_dir / "latest_MVBS.zarr")
+    ds_MVBS = xr.open_zarr(config.cache_dir / config.mvbs_file)
     egram = echogram(
         ds_MVBS,
         channel=config.channels,
-        vert_dim="depth",
+        vert_dim=config.vertical_dimension,
     ).opts(
         hv.opts.Image(
             cmap="viridis",
-            clim=(-70, -36),
+            clim=config.color_limits,
             colorbar=True,
             width=1000,
             height=400,
@@ -35,7 +35,7 @@ def update_cache_multi_freq():
         ),
         hv.opts.QuadMesh(
             cmap="viridis",
-            clim=(-70, -36),
+            clim=config.color_limits,
             colorbar=True,
             width=1000,
             height=400,
@@ -72,14 +72,14 @@ def update_cache_tricolor():
     """
     Load latest MVBS data and create tricolor echogram.
     """
-    ds_MVBS = xr.open_zarr(config.cache_dir / "latest_MVBS.zarr")
+    ds_MVBS = xr.open_zarr(config.cache_dir / config.mvbs_file)
 
     tricolor = tricolor_echogram(
         ds_MVBS,
         channel=config.tricolor_channels,
-        vmin=-70,
-        vmax=-36,
-        vert_dim="depth",
+        vmin=config.color_limits[0],
+        vmax=config.color_limits[1],
+        vert_dim=config.vertical_dimension,
     ).opts(
         width=1200,
         height=600,
@@ -116,7 +116,7 @@ def create_contours_overlay():
     Convert hake contours dataframe into HoloViews paths.
     """
 
-    contours_df = pd.read_csv(config.cache_dir / "latest_contours.csv")
+    contours_df = pd.read_csv(config.cache_dir / config.contours_file)
 
     # Convert string representations back to arrays
     contours_df["depth"] = contours_df["depth"].apply(
@@ -144,10 +144,10 @@ def create_contours_overlay():
         hv_paths.append(
             {
                 "ping_time": time,
-                "depth": depth,
+                config.vertical_dimension: depth,
             }
         )
-    contours_hv = hv.Path(hv_paths, kdims=["ping_time", "depth"],).opts(
+    contours_hv = hv.Path(hv_paths, kdims=["ping_time", config.vertical_dimension],).opts(
         color="magenta",
         line_width=3,
     )

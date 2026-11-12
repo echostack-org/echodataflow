@@ -92,3 +92,24 @@ def test_echogram_ignores_invalid_bio_section(tmp_path):
     data["bio"] = {"data_dir": "missing"}
     path.write_text(yaml.safe_dump(data))
     assert load_config("echogram", path).cache_dir == tmp_path
+
+
+@pytest.mark.parametrize("limits", [[0, -10], [float("nan"), 0], [-70, float("inf")]])
+def test_invalid_echogram_color_limits(tmp_path, limits):
+    with pytest.raises(ValidationError, match="finite and increasing"):
+        load_config("echogram", write_config(tmp_path, color_limits=limits))
+
+
+def test_external_recipe_config_paths(tmp_path):
+    recipe_dir = tmp_path / "echodataflow-recipes" / "recipes_nrt" / "hake"
+    recipe_dir.mkdir(parents=True)
+    (recipe_dir / "cache").mkdir()
+    path = write_config(recipe_dir, cache_dir="cache", mvbs_file="custom.zarr",
+                        contours_file="custom.csv", vertical_dimension="range_sample",
+                        color_limits=[-80, -40])
+    config = load_config("echogram", path)
+    assert config.cache_dir == recipe_dir / "cache"
+    assert str(config.mvbs_file) == "custom.zarr"
+    assert str(config.contours_file) == "custom.csv"
+    assert config.vertical_dimension == "range_sample"
+    assert config.color_limits == (-80, -40)
