@@ -10,22 +10,31 @@ import pandas as pd
 import xarray as xr
 
 
-CHANNELS = [
-    "WBT 987760-15 ES18_ES",
-    "WBT 987763-15 ES38-7_ES",
-    "WBT 987766-15 ES70-7C_ES",
-    "WBT 987753-15 ES120-7C_ES",
-    "WBT 987771-15 ES200-7C_ES",
-    "WBT 987769-15 ES333-7C_ES",
+SHIMADA_CHANNELS = [
+    "WBT 400141-15 ES18_ES",
+    "WBT 400143-15 ES38B_ES",
+    "WBT 400142-15 ES70-7C_ES",
+    "WBT 400140-15 ES120-7C_ES",
+    "WBT 400145-15 ES200-7C_ES",
 ]
 
 
-def test_lasker_echograms(monkeypatch):
-    # Import the real service without starting the Panel server.
-    with patch("panel.serve"):
-        viz = importlib.import_module(
-            "echodataflow.services.viz_echogram_track_lasker"
-        )
+def test_echograms(monkeypatch, tmp_path):
+    import yaml
+
+    channels = SHIMADA_CHANNELS
+    config_path = tmp_path / "viz.yaml"
+    config_path.write_text(yaml.safe_dump({"echogram": {
+        "cache_dir": str(tmp_path),
+        "channels": channels,
+        "tricolor_channels": [channels[3], channels[1], channels[0]],
+        "port": 1809,
+    }}))
+    monkeypatch.setenv("ECHODATAFLOW_VIZ_CONFIG", str(config_path))
+    with patch("panel.serve") as serve:
+        viz = importlib.import_module("echodataflow.viz.viz_echogram")
+    assert serve.call_args.kwargs["port"] == 1809
+    assert viz.config.cache_dir == tmp_path
 
     rng = np.random.default_rng(42)
 
@@ -33,11 +42,11 @@ def test_lasker_echograms(monkeypatch):
         {
             "Sv": (
                 ("channel", "ping_time", "depth"),
-                rng.uniform(-90, -30, (6, 20, 30)),
+                rng.uniform(-90, -30, (len(channels), 20, 30)),
             )
         },
         coords={
-            "channel": CHANNELS,
+            "channel": channels,
             "ping_time": pd.date_range(
                 "2026-01-01", periods=20, freq="s"
             ),
