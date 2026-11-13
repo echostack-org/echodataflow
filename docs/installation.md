@@ -31,7 +31,7 @@ rclone version
 
 Echodataflow `v0.2.0` is currently under development and has not been released, and therefore cannot be installed directly from PyPI or conda yet.
 
-### Instal as an installed package
+### Install as a package
 To run Echodataflow as an installed package, install it directly from the repository:
 ```shell
 uv pip install "echodataflow[dev,mission] @ git+https://github.com/echostack-org/echodataflow.git"
@@ -63,6 +63,7 @@ package separately in the same environment:
 ```shell
 uv pip install "segmentation-inference @ git+https://github.com/uw-echospace/segmentation_inference.git"
 ```
+The hake segmentation model weight can be separately downloaded from the [echodataflow-recipes release asset](https://github.com/echostack-org/echodataflow-recipes/releases/tag/data-v1).
 :::
 
 
@@ -80,12 +81,6 @@ echodataflow-deploy --help
 ```
 
 
-
-
-:::{note}
-The hake segmentation model weight can be separately downloaded from [LINK] and
-set its path via the `path_weight` for the `classify_backscatter` flow to function.
-:::
 
 
 
