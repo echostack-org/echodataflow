@@ -41,13 +41,13 @@ Once the server and the worker are running, you can open the Prefect dashboard [
 ### 3. Deploy the edge workflows
 
 To deploy the edge workflows, we first make sure we have the recipes and resources ready:
-- clone the [`echodataflow-recipes`] repository:
+- Clone the [`echodataflow-recipes`] repository:
     ```shell
     cd TEST_DIRECTORY  # switch into a test directory
     git clone https://github.com/echostack-org/echodataflow-recipes.git
     ```
     The `recipes_nrt/edge2cloud_hake` folder in the cloned repository has the necessary [deployment and parameters recipes](overview_recipes) and a list of cloud raw file paths in the `resources/` subfolder/
-- download the echogram segmentation model that detects hake: download `hake_model.zip` from the GitHub [release asset](https://github.com/echostack-org/echodataflow-recipes/releases/tag/data-v1), unzip and put the content `hake_model.ckpt` under `recipes_nrt/edge2cloud_hake/resources`.
+- Download the echogram segmentation model that detects hake: download `hake_model.zip` from the GitHub [release asset](https://github.com/echostack-org/echodataflow-recipes/releases/tag/data-v1), unzip and put the content `hake_model.ckpt` under `recipes_nrt/edge2cloud_hake/resources`.
 
 Then we can deploy the edge workflows by running below in another terminal:
 ```shell
@@ -56,6 +56,7 @@ cd TEST_DIRECTORY/echodataflow-recipes
 
 # deploy the edge workflows
 echodataflow-deploy run \
+  --default-work-pool-name local \
   --deploy-spec recipes_nrt/edge2cloud_hake/edge/deploy.yaml \
   --param-config recipes_nrt/edge2cloud_hake/edge/params.yaml
 ```
@@ -128,6 +129,7 @@ cd TEST_DIRECTORY/echodataflow-recipes
 
 # deploy the cloud workflows
 PREFECT_PROFILE=my_cloud echodataflow-deploy run \
+  --default-work-pool-name cloud-local \
   --deploy-spec recipes_nrt/edge2cloud_hake/cloud/deploy.yaml \
   --param-config recipes_nrt/edge2cloud_hake/cloud/params.yaml
 ```
