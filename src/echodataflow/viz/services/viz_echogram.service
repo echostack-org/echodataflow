@@ -5,8 +5,8 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-EnvironmentFile=%h/.config/echodataflow/services.env
-ExecStart=/bin/bash -c 'cd "$${ECHODATAFLOW_WORKDIR:?ECHODATAFLOW_WORKDIR is required}" && exec "$${MAMBA_BIN:?MAMBA_BIN is required}" run -n "$${ECHODATAFLOW_ENV:?ECHODATAFLOW_ENV is required}" python -m echodataflow.viz.viz_echogram --config-file "$${ECHODATAFLOW_VIZ_CONFIG:?ECHODATAFLOW_VIZ_CONFIG is required}"'
+# Source with Bash to expand variable references in services.env.
+ExecStart=/bin/bash -c 'set -a; source "%h/.config/echodataflow/services.env" && cd "$${ECHODATAFLOW_WORKDIR:?ECHODATAFLOW_WORKDIR is required}" && exec "$${MAMBA_BIN:?MAMBA_BIN is required}" run -n "$${ECHODATAFLOW_ENV:?ECHODATAFLOW_ENV is required}" python -m echodataflow.viz.viz_echogram --config-file "$${ECHODATAFLOW_VIZ_CONFIG:?ECHODATAFLOW_VIZ_CONFIG is required}"'
 Restart=always
 RestartSec=30
 StandardOutput=journal
