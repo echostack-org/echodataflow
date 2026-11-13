@@ -182,6 +182,7 @@ To run these services. Follow the steps below:
     ~/.config/echodataflow/services.env
     ```
 - In `services.env`, set the following variables:
+    - `ECHODATAFLOW_HOME`: your home directory
     - `ECHODATAFLOW_ENV`: your echodataflow environment
     - `MAMBA_BIN`: full path of your conda or mamba executable
     - `ECHODATAFLOW_VIZ_CONFIG`: absolute path of `recipes_nrt/edge2cloud_hake/cloud/viz.yaml`
