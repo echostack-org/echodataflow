@@ -1,4 +1,4 @@
-from echodataflow.viz.config import load_config
+from echodataflow.viz.config import load_config, parse_config_file
 
 import holoviews as hv
 import numpy as np
@@ -7,12 +7,14 @@ import panel as pn
 import xarray as xr
 from echoshader.elements.echogram import echogram, tricolor_echogram
 
+config_file = parse_config_file() if __name__ == "__main__" else None
+
 hv.extension("bokeh")
 
 # Configure Panel to prevent automatic refreshes
 pn.config.autoreload = False
 
-config = load_config("echogram")
+config = load_config("echogram", config_file)
 
 
 def update_cache_multi_freq():

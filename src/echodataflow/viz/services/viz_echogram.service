@@ -1,20 +1,17 @@
 [Unit]
 Description=Visualization of echogram and ship track
-After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
-WorkingDirectory=/home/exouser/code_git/echodataflow/src/echodataflow/viz
-Environment=PATH=/home/exouser/miniforge3/condabin:/usr/local/bin:/usr/bin:/bin
-EnvironmentFile=/home/exouser/.config/echodataflow/services.env
-ExecStart=/usr/bin/env bash -lc '"${MAMBA_BIN}" run -n "${ECHODATAFLOW_ENV}" python viz_echogram.py'
+EnvironmentFile=%h/.config/echodataflow/services.env
+ExecStart=/bin/bash -c 'cd "$${ECHODATAFLOW_WORKDIR:?ECHODATAFLOW_WORKDIR is required}" && exec "$${MAMBA_BIN:?MAMBA_BIN is required}" run -n "$${ECHODATAFLOW_ENV:?ECHODATAFLOW_ENV is required}" python -m echodataflow.viz.viz_echogram --config-file "$${ECHODATAFLOW_VIZ_CONFIG:?ECHODATAFLOW_VIZ_CONFIG is required}"'
 Restart=always
 RestartSec=30
-StartLimitInterval=300
-StartLimitBurst=5
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=IWCPS_202606_echogram
+SyslogIdentifier=echodataflow_viz_echogram
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
