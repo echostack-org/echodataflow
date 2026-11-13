@@ -14,6 +14,10 @@ class FlowRegistration:
 
 
 FLOW_REGISTRY: dict[str, FlowRegistration] = {
+    "update_display": FlowRegistration(
+        entrypoint="echodataflow/flows/flows_display.py:flow_update_display",
+        description="Prepare generic numeric display products for Echoshader.",
+    ),
     "raw2Sv": FlowRegistration(
         entrypoint="echodataflow/flows/flows_acoustics.py:flow_raw2Sv",
         description="Incrementally convert newly available raw sonar files to Sv.",
