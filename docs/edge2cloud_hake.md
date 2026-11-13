@@ -11,7 +11,7 @@ The recipes are in `recipes_nrt/edge2cloud_hake/` in the [echodataflow-recipes r
 The example recipes are configured to use the acoustic data collected during the 2025 [Integrated West Coast Pelagics Survey (IWCPS)](https://www.fisheries.noaa.gov/west-coast/science-data/integrated-west-coast-pelagics-survey) and mock trawl data (i.e. not real catch data), both hosted on an [Open Storage Network](https://www.openstoragenetwork.org/) cloud bucket.
 
 :::{note}
-Raw acoustic data files and processed outputs can require substantial disk space. Make sure your local (edge) machine and the cloud virtual machine (VM) has room for downloaded files, intermediate products, and visualization caches.
+Raw acoustic data files and processed outputs can require substantial disk space. Make sure your local (edge) machine and the cloud virtual machine (VM) has room for downloaded files, intermediate products, and visualization caches. The data generated from the edge and cloud workflows will be stored in the folders `recipes_nrt/edge2cloud_hake/edge/data` and `recipes_nrt/edge2cloud_hake/cloud/data`, respectively, within your cloned `echodataflow-recipes` folder.
 :::
 
 
