@@ -114,18 +114,14 @@ def prepare_transect_caches(
             continue
         paths = [path_cps / name for name in selected]
         if any(not path.exists() for path in paths):
-            print(
-                f"Transect {number}: registered source files are missing; cache not rebuilt."
-            )
+            print(f"Transect {number}: registered source files are missing; cache not rebuilt.")
             continue
         revision = _fingerprint(paths, start, end)
         full = output / f"transect_{number}.zarr"
         if _published(full, revision):
             continue
         if not _published(full, revision):
-            print(
-                f"Preparing full-resolution transect {number} from {len(paths)} CPS stores."
-            )
+            print(f"Preparing full-resolution transect {number} from {len(paths)} CPS stores.")
             with ExitStack() as stack:
                 parts = []
                 for path in paths:
@@ -146,9 +142,7 @@ def prepare_transect_caches(
                     ]
                     part = source[names]
                     if any(var.chunks is not None for var in part.variables.values()):
-                        part = part.chunk(
-                            {d: -1 for d in part.dims if d != "ping_time"}
-                        )
+                        part = part.chunk({d: -1 for d in part.dims if d != "ping_time"})
                     parts.append(part)
                 data = xr.concat(
                     parts,

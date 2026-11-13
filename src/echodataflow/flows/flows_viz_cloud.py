@@ -84,9 +84,7 @@ def flow_update_cache_MVBS(
         return
     else:
         # Assmeble fs mapper for the MVBS files
-        MVBS_filenames = [
-            fs.get_mapper(str(Path(path_MVBS) / mvbsf)) for mvbsf in MVBS_filenames
-        ]
+        MVBS_filenames = [fs.get_mapper(str(Path(path_MVBS) / mvbsf)) for mvbsf in MVBS_filenames]
 
         # Combine and prepare MVBS dataset
         ds_MVBS = xr.open_mfdataset(
@@ -123,9 +121,7 @@ def flow_update_cache_MVBS(
                 ds_MVBS[var].encoding.pop("preferred_chunks")
 
         # Save to cache
-        logger.info(
-            f"Saving MVBS dataset to cache: {str(Path(path_cache) / file_MVBS_zarr)}"
-        )
+        logger.info(f"Saving MVBS dataset to cache: {str(Path(path_cache) / file_MVBS_zarr)}")
         ds_MVBS.chunk({"channel": -1, "ping_time": -1, "echo_range": -1}).to_zarr(
             Path(path_cache) / file_MVBS_zarr,  # cache is local
             mode="w",
@@ -247,10 +243,9 @@ def flow_update_cache_CPS(
     preview_max_pings: int = 400,
     preview_max_range_samples: int = 160,
 ):
-    """Publish full transects only; historical parameters are accepted for compatibility.
+    """Publish full transect Zarrs for Echoshader.
 
-    Display raster generation runs in flow_update_display. No median coordinate,
-    sorting, ping deduplication, legacy latest image or subsampled preview is written.
+    Historical filename and preview parameters are accepted for compatibility.
     """
     root = Path(path_CPS)
     database = resolve_database(root.parent, processing_db)
