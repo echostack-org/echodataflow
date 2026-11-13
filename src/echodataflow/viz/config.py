@@ -1,5 +1,6 @@
 """Configuration for visualization applications."""
 
+import argparse
 import os
 from pathlib import Path
 from typing import Annotated, Literal, Self, overload
@@ -16,6 +17,17 @@ from pydantic import (
 )
 
 ChannelID = Annotated[str, StringConstraints(strict=True, strip_whitespace=True, min_length=1)]
+
+
+def parse_config_file() -> Path | None:
+    """Read the visualization app's optional configuration argument."""
+    parser = argparse.ArgumentParser(description="Run an echodataflow visualization app.")
+    parser.add_argument(
+        "--config-file",
+        type=Path,
+        help="Visualization YAML path (overrides ECHODATAFLOW_VIZ_CONFIG).",
+    )
+    return parser.parse_args().config_file
 
 
 class EchogramConfig(BaseModel):
@@ -97,16 +109,21 @@ def load_config(
 ) -> EchogramConfig | BioConfig:
     """Load one YAML section and resolve its directory against the config file.
 
-    Only the selected application's settings are validated. The path defaults to
-    ECHODATAFLOW_VIZ_CONFIG, then ~/.config/echodataflow/viz.yaml.
+    Only the selected application's settings are validated. Supply a path via 
+    command line or set ECHODATAFLOW_VIZ_CONFIG (loaded from services.env by 
+    system services).
     """
     models = {"echogram": (EchogramConfig, "cache_dir"), "bio": (BioConfig, "data_dir")}
     if section not in models:
         raise ValueError(f"Unknown visualization config section: {section}")
     model, directory_key = models[section]
-    config_path = Path(
-        path or os.environ.get("ECHODATAFLOW_VIZ_CONFIG", "~/.config/echodataflow/viz.yaml")
-    ).expanduser()
+    configured_path = path or os.environ.get("ECHODATAFLOW_VIZ_CONFIG")
+    if not configured_path:
+        raise ValueError(
+            "Visualization configuration path is required: pass --config-file or set "
+            "ECHODATAFLOW_VIZ_CONFIG in services.env for system services."
+        )
+    config_path = Path(configured_path).expanduser()
     with config_path.open() as stream:
         document = yaml.safe_load(stream)
     data = document.get(section) if isinstance(document, dict) else None
