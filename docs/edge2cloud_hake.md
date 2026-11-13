@@ -2,11 +2,19 @@
 
 ## Overview
 
-- What the workflow does
-- Explain the edge vs cloud split of workflow components
-- Explain the edge and cloud setup briefly and link to the specific steps below
-- Add a note about large data outputs
-- Point to the exact recipe folder
+This example integrates acoustic and trawl data to generate estimates of Pacific hake abundance and biomass in near real time. The workflow runs across a ship (the "edge") and the cloud:
+- **Edge:** process raw echosounder files, detect hake with a deep learning echogram segmentation model, and upload reduced acoustic products, including nautical areal scattering coefficient (NASC) and mean volume backscattering strength (MVBS).Trawl biological data, such as fish length, weight, and sex, are uploaded separately.
+- **Cloud:** combine acoustic and trawl data to estimate biomass and abundance, and display the results in interactive echogram and biological visualization apps
+
+The recipes are in `recipes_nrt/edge2cloud_hake/` in the [echodataflow-recipes repository](https://github.com/echostack-org/echodataflow-recipes), with separate `edge/` and `cloud/` configurations. Follow Steps 1–3 below to run the edge workflows, and Step 4-6 to run the cloud workflows and visualization.
+
+The example recipes are configured to use the acoustic data collected during the 2025 [Integrated West Coast Pelagics Survey (IWCPS)](https://www.fisheries.noaa.gov/west-coast/science-data/integrated-west-coast-pelagics-survey) and mock trawl data (i.e. not real catch data), both hosted on an [Open Storage Network](https://www.openstoragenetwork.org/) cloud bucket.
+
+:::{note}
+Raw acoustic data files and processed outputs can require substantial disk space. Make sure your local (edge) machine and the cloud virtual machine (VM) has room for downloaded files, intermediate products, and visualization caches.
+:::
+
+
 
 
 
@@ -61,7 +69,7 @@ Once the command runs through, explore the local Prefect dashboard [http://127.0
 ### 4. Run cloud Prefect worker and connect to Prefect Cloud
 
 To run the cloud workflows, we first make sure we have the environment and Prefect Cloud workspace ready:
-- configure and start a cloud virtual machine (VM)
+- configure and start a cloud VM
 - on the cloud VM, follow step 1 to install and activate an echodataflow environment, and clone the `echodataflow-recipes` repository following step 3.
 - separately, create an account and workspace on [Prefect Cloud](https://app.prefect.cloud/), or use an existing workspace.
 
