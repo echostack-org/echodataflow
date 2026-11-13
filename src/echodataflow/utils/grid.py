@@ -222,7 +222,7 @@ def clip_grid_with_coastline(cells_gdf, full_coast, utm_code, boundary_box):
     return clipped_coast
 
 
-def calculate_cell_areas(cells_gdf, boundary_box_unbuffered_gdf, projection="epsg:4326"):
+def calculate_cell_areas(cells_gdf, projection="epsg:4326"):
     """
     Calculate cell areas and convert back to original projection
     
@@ -230,8 +230,6 @@ def calculate_cell_areas(cells_gdf, boundary_box_unbuffered_gdf, projection="eps
     ----------
     cells_gdf : GeoDataFrame
         Grid cells in UTM projection
-    boundary_box_unbuffered_gdf : GeoDataFrame
-        Boundary box for clipping
     projection : str, default="epsg:4326"
         Target projection
         
@@ -245,12 +243,8 @@ def calculate_cell_areas(cells_gdf, boundary_box_unbuffered_gdf, projection="eps
     # Convert back to nmi^2 from m^2
     cells_gdf.loc[:, "area"] = cells_gdf.loc[:, "area"] / 1852**2
 
-    # Convert back to original projection and clip
-    clipped_cells_latlon = gpd.clip(
-        cells_gdf.to_crs(projection), boundary_box_unbuffered_gdf
-    ).reset_index(drop=True)
-    
-    return clipped_cells_latlon
+    # Convert UTM geometry to the output CRS used for storage and plotting
+    return cells_gdf.to_crs(projection).reset_index(drop=True)
 
 def filter_grid_cells(clipped_cells_latlon, area_threshold=10):
     """
@@ -428,7 +422,7 @@ def create_grid_from_bounds(
     coastline_clipped = clip_grid_with_coastline(cells_gdf, full_coast, utm_code, boundary_box)
     
     # Calculate areas and convert back to lat/lon
-    clipped_cells_latlon = calculate_cell_areas(cells_gdf, boundary_box_unbuffered_gdf, projection)
+    clipped_cells_latlon = calculate_cell_areas(cells_gdf, projection)
     
     # Filter small or invalid cells
     if area_threshold > 0:

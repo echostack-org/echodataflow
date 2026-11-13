@@ -1,5 +1,5 @@
 
-from pathlib import Path
+from echodataflow.viz.config import load_config
 import datetime
 
 import numpy as np
@@ -7,14 +7,15 @@ import pandas as pd
 import geopandas as gpd
 import shapely
 
-from bokeh.models import HoverTool
+from bokeh.models import HoverTool, PrintfTickFormatter
+from cartopy import crs as ccrs
 import holoviews as hv
 import geoviews as gv
 import geoviews.tile_sources as gvts
 import panel as pn
 
 
-from viz_core import (
+from echodataflow.viz.viz_core import (
     THEME, BIO_VAR_NAME, COLORBAR_LABEL, BIO_VAR_UNIT, BIO_VAR_CLIM
 )
 
@@ -25,13 +26,13 @@ hv.renderer("bokeh").theme = THEME
 pn.extension()
 
 
-# Path to data files
-path_vm_local = Path("/media/volume/shimada_202506_volume/integration")
-file_grid = path_vm_local / "grid_cells.geojson"
-file_NASC = path_vm_local / "NASC_all.csv"
-file_length_count = path_vm_local / "length_count_all.csv"
-file_specimen = path_vm_local / "specimen_all.csv"
+# Deployment settings and data files
+config = load_config("bio")
+bio_var_clim = {**BIO_VAR_CLIM, **config.color_limits}
 
+for basemap in (config.grid_basemap, config.track_basemap):
+    if not isinstance(getattr(gvts, basemap, None), gvts.WMTS):
+        raise ValueError(f"Unknown basemap tile source: {basemap}")
 
 
 # Define length count app widgets
@@ -49,7 +50,7 @@ def plot_length_count(refresh) -> hv.Overlay:
     Plot length count from all haul catches.
     """
     # Load data
-    df_len_cnt_all = pd.read_csv(file_length_count)
+    df_len_cnt_all = pd.read_csv(config.data_dir / config.length_count_file)
 
     # Define stratum options and colors
     stratum_options = sorted(df_len_cnt_all["stratum"].dropna().unique())
@@ -108,7 +109,7 @@ def length_count_app():
     if not hasattr(doc, "length_count_callback"):
         doc.length_count_callback = pn.state.add_periodic_callback(
             scheduled_update,
-            period=10*60*1000  # Update every 10 mins
+            period=config.refresh_seconds * 1000
         )
         def cleanup(session_context):
             try:
@@ -137,7 +138,7 @@ def plot_length_weight(refresh, axis_scale) -> hv.Layout:
     """
     Plot length vs weight scatter for all strata and sex, with axis scale selector and separate legend for each plot.
     """
-    df_specimen_all = pd.read_csv(file_specimen)
+    df_specimen_all = pd.read_csv(config.data_dir / config.specimen_file)
     stratum_options = sorted(df_specimen_all["stratum"].dropna().unique())
     stratum_colors = hv.Cycle("Category10").values
     stratum_colors = {stratum: stratum_colors[i % len(stratum_colors)] for i, stratum in enumerate(stratum_options)}
@@ -197,7 +198,7 @@ def length_weight_app():
     if not hasattr(doc, "length_weight_callback"):
         doc.length_weight_callback = pn.state.add_periodic_callback(
             scheduled_update,
-            period=10*60*1000  # Update every 10 mins
+            period=config.refresh_seconds * 1000
         )
         def cleanup(session_context):
             try:
@@ -231,9 +232,10 @@ update_text_grid_app = pn.pane.Markdown(
 )
 
 bio_var_selector_grid_map = pn.widgets.Select(
-    name="Biological estimate to plot",
+    name="Variable to display",
     options=list(BIO_VAR_NAME.keys()),
-    value="NASC"
+    value="NASC",
+    width=200,
 )
 
 # Get all WMTS tile source names
@@ -242,7 +244,8 @@ tile_options = [name for name, obj in gvts.__dict__.items() if isinstance(obj, g
 tile_selector_grid_map = pn.widgets.Select(
     name="Basemap tile source",
     options=tile_options,
-    value="EsriNatGeo"
+    value=config.grid_basemap,
+    width=300,
 )
 
 # Hidden widget for forcing plot refresh
@@ -259,14 +262,14 @@ def plot_grid_map(
     Plot grid map according to the selected biological variable and tile source.
     """      
     # Load grid file
-    gdf_grids = gpd.read_file(file_grid)
+    gdf_grids = gpd.read_file(config.data_dir / config.grid_file)
     gdf_grids = clean_cells(gdf_grids)
 
     # Get variable attributes
     var = BIO_VAR_NAME.get(bio_var, "biomass")
     var_units = BIO_VAR_UNIT.get(var, "biomass")
     colorbar_label = COLORBAR_LABEL.get(var, "biomass")
-    var_clim = BIO_VAR_CLIM.get(var, "biomass")
+    var_clim = bio_var_clim.get(var, "biomass")
 
     # Get the base tilemap
     tile = getattr(gvts, map_tile)
@@ -289,13 +292,14 @@ def plot_grid_map(
         gdf_grids, 
         vdims=[var, f"{var}_label", "area"]
     ).opts(
-        width=900,
+        width=600,
         height=800,
         colorbar=True,
         cmap="viridis",
         clim=var_clim,
         clipping_colors={"NaN": "white"},
-        colorbar_opts={"title": colorbar_label},
+        clabel=f"{colorbar_label} ({var_units})",
+        colorbar_opts={"formatter": PrintfTickFormatter(format="%.1e")},
         line_color="black",
         alpha=0.5,
         labelled=[bio_var],
@@ -315,9 +319,18 @@ def grid_app():
     """
     Application to visualize bio estimate grid cells.
     """
+    selectors = pn.Row(
+        pn.Spacer(sizing_mode="stretch_width"),
+        bio_var_selector_grid_map,
+        tile_selector_grid_map,
+        pn.Spacer(sizing_mode="stretch_width"),
+        width=600,
+    )
     layout = pn.Column(
-        update_text_grid_app, bio_var_selector_grid_map, tile_selector_grid_map, plot_grid_map,
-        sizing_mode="stretch_width"
+        update_text_grid_app,
+        selectors,
+        plot_grid_map,
+        sizing_mode="stretch_width",
     )
 
     def scheduled_update():
@@ -341,7 +354,7 @@ def grid_app():
     if not hasattr(doc, "grid_map_callback"):
         doc.grid_map_callback = pn.state.add_periodic_callback(
             scheduled_update,
-            period=10*60*1000  # Update every 10 mins
+            period=config.refresh_seconds * 1000
         )
         def cleanup(session_context):
             try:
@@ -363,9 +376,10 @@ update_text_track_app = pn.pane.Markdown(
 )
 
 bio_var_selector_track_map = pn.widgets.Select(
-    name="Biological estimate to plot",
+    name="Variable to display",
     options=["NASC", "Number density", "Biomass density"],
-    value="NASC"
+    value="NASC",
+    width=200,
 )
 
 # Get all WMTS tile source names
@@ -374,7 +388,8 @@ tile_options = [name for name, obj in gvts.__dict__.items() if isinstance(obj, g
 tile_selector_track_map = pn.widgets.Select(
     name="Basemap tile source",
     options=tile_options,
-    value="EsriOceanBase"
+    value=config.track_basemap,
+    width=300,
 )
 
 # Hidden widget for forcing plot refresh
@@ -401,7 +416,7 @@ def plot_track_map(
     Plot track map with NASC bubbles according to the selected biological variable and tile source.
     """      
     # Load grid file
-    df_NASC = pd.read_csv(file_NASC, index_col=0)
+    df_NASC = pd.read_csv(config.data_dir / config.nasc_file, index_col=0)
 
     # Filter points with nonzero NASC and format ping_time
     df_NASC_sel = df_NASC[
@@ -414,7 +429,9 @@ def plot_track_map(
 
     # Get variable attributes
     var = BIO_VAR_NAME.get(bio_var, "NASC")
-    var_clim = BIO_VAR_CLIM.get(var, "NASC")
+    var_units = BIO_VAR_UNIT.get(var, "NASC")
+    colorbar_label = COLORBAR_LABEL.get(var, "NASC")
+    var_clim = bio_var_clim.get(var, "NASC")
 
     # Get the base tilemap
     tile = getattr(gvts, map_tile)
@@ -436,13 +453,15 @@ def plot_track_map(
         cmap="Reds",
         clim=var_clim,
         colorbar=True,
+        clabel=f"{colorbar_label} ({var_units})",
+        colorbar_opts={"formatter": PrintfTickFormatter(format="%.1e")},
         size="size",
         alpha=0.5,
-        width=900,
+        width=800,
         height=800,
         tools=["hover"],
-        xlabel="Longitude",
-        ylabel="Latitude",
+        xlabel="Longitude (\u00B0E)",
+        ylabel="Latitude (\u00B0N)",
         title=f"Ship track with {bio_var}",
         hover_tooltips=[
             ('Longitude', '@longitude'),
@@ -458,8 +477,21 @@ def plot_track_map(
         line_width=1
     )
 
+    # Derive latitude extent with padding
+    latitude_padding = 1
+    latitude_min = df_NASC_sel["latitude"].min() - latitude_padding
+    latitude_max = df_NASC_sel["latitude"].max() + latitude_padding
+
+    # WMTS/Bokeh axes use Web Mercator meters, so project latitude degrees first
+    mercator = ccrs.GOOGLE_MERCATOR
+    plate_carree = ccrs.PlateCarree()
+    y_min = mercator.transform_point(0, latitude_min, plate_carree)[1]
+    y_max = mercator.transform_point(0, latitude_max, plate_carree)[1]
+
     # Combine with tilemap
-    overlay = tile * points * track
+    overlay = (tile * points * track).opts(
+        ylim=(y_min, y_max),
+    )
 
     return overlay
 
@@ -468,9 +500,18 @@ def track_app():
     """
     Application to visualize track with NASC bubbles.
     """
+    selectors = pn.Row(
+        pn.Spacer(sizing_mode="stretch_width"),
+        bio_var_selector_track_map,
+        tile_selector_track_map,
+        pn.Spacer(sizing_mode="stretch_width"),
+        width=800,
+    )
     layout = pn.Column(
-        update_text_track_app, bio_var_selector_track_map, tile_selector_track_map, plot_track_map,
-        sizing_mode="stretch_width"
+        update_text_track_app,
+        selectors,
+        plot_track_map,
+        sizing_mode="stretch_width",
     )
 
     def scheduled_update():
@@ -488,7 +529,7 @@ def track_app():
     if not hasattr(doc, "track_map_callback"):
         doc.track_map_callback = pn.state.add_periodic_callback(
             scheduled_update,
-            period=10*60*1000  # Update every 10 mins
+            period=config.refresh_seconds * 1000
         )
         def cleanup(session_context):
             try:
@@ -512,7 +553,7 @@ test_server = pn.serve(
         "length_weight_scatter": length_weight_app,
         "track_map": track_app,
     },
-    port=1804,
+    port=config.port,
     websocket_origin="*",
     admin=True,
     show=False,
