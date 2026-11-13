@@ -92,13 +92,11 @@ prefect --profile my_cloud cloud workspace set --workspace "<account-handle>/<wo
 ```
 
 :::{note}
-The `my_cloud` profile is a local configuration that stores connection settings for your Prefect Cloud workspace. It is separate from the account and workspace created on Prefect Cloud.
-
-See the [Prefect Cloud connection guide](https://docs.prefect.io/v3/how-to-guides/cloud/connect-to-cloud) for details.
+The `my_cloud` profile is a local configuration that stores connection settings for your Prefect Cloud workspace. It is separate from the account and workspace created on Prefect Cloud. See the [Prefect Cloud connection guide](https://docs.prefect.io/v3/how-to-guides/cloud/connect-to-cloud) for details.
 :::
 
 
-#### Run a worker in workpool `cloud-local`
+#### Run a worker in the `cloud-local` work pool
 After establishing the Prefect Cloud connection above, run the following on the cloud VM to create the `cloud-local` work pool (as specified in `recipes_nrt/edge2cloud_hake/cloud/deploy.yaml`) and start a worker for it:
 ```shell
 # create the work pool "cloud-local" and start a worker
@@ -207,5 +205,8 @@ To run these services. Follow the steps below:
     ```
 
 :::{note}
-If you make changes to `services.env`, restart the apps with `systemctl --user restart viz_echogram.service viz_bio.service`.
+If you make changes to `services.env`, restart the apps with
+```shell
+systemctl --user restart viz_echogram.service viz_bio.service
+```
 :::
