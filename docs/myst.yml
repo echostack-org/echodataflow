@@ -19,7 +19,7 @@ project:
       file: pipeline_examples.md
       children:
         - file: cps.md
-        - file: hake_edge2cloud.md
+        - file: edge2cloud_hake.md
         - file: spasso.md
     - title: References
       children:

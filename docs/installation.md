@@ -1,3 +1,4 @@
+(installation)=
 # Installation
 
 Echodataflow is available and tested for Python 3.13-3.14. We recommend using a Conda environment because of its scientific and geospatial dependencies.
