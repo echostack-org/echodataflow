@@ -1,3 +1,4 @@
+(installation)=
 # Installation
 
 Echodataflow is available and tested for Python 3.13-3.14. We recommend using a Conda environment because of its scientific and geospatial dependencies.
@@ -90,9 +91,7 @@ set its path via the `path_weight` for the `classify_backscatter` flow to functi
 
 ## Get the deployment recipes
 
-Example recipes are maintained separately on a companion repository
-[echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes).
-You can download the recipes directly from the repo or get a copy by cloning it:
+Example recipes are maintained separately on a companion repository [echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes). You can download the recipes directly from the repo or get a copy by cloning it:
 
 ```shell
 git clone https://github.com/echostack-org/echodataflow-recipes.git

@@ -22,20 +22,15 @@ such as [Echopype](https://github.com/echostack-org/echopype) to run workflows o
 computing infrastructures.
 
 
-Check out example recipes hosted on the companion repository
-[echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes).
+Check out example recipes hosted on the companion repository [echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes).
 
 
-**Note**: Echodataflow `v0.1.x` is deprecated. We are currently preparing for the `v0.2.0` release,
-which contains a redesigned architecture and more straightforward mechanisms to add workflow
-components.
+**Note**: Echodataflow `v0.1.x` is deprecated. We are currently preparing for the `v0.2.0` release, which contains a redesigned architecture and more straightforward mechanisms to add pipeline components.
 
 
 ## Documentation
 
-Learn more about echodataflow in the documentation at
-[echodataflow.readthedocs.io](https://echodataflow.readthedocs.io/),
-including [how to install](docs/installation.md). 
+Learn more about echodataflow in the documentation at [echodataflow.readthedocs.io](https://echodataflow.readthedocs.io/), including [how to install](docs/installation.md). 
 
 
 
@@ -46,8 +41,7 @@ Echodataflow is currently developed and maintained by Wu-Jung Lee ([@leewujung](
 
 
 ## Acknowledgement
-We thank funding support from the NOAA Northwest Fisheries Science Center and the 
-Active Acoustics Strategic Inititave (AA-SI) to the development of Echodataflow.
+We thank funding support from the NOAA Northwest Fisheries Science Center and the Active Acoustics Strategic Inititave (AA-SI) to the development of Echodataflow.
 
 <a href="https://upload.wikimedia.org/wikipedia/commons/7/79/NOAA_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original" style="text-decoration:none;">
     <img src="https://upload.wikimedia.org/wikipedia/commons/7/79/NOAA_logo.svg?utm_source=commons.wikimedia.org&utm_campaign=index&utm_content=original" alt="NOAA" width="120">

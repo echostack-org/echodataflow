@@ -1,5 +1,6 @@
 
-from echodataflow.viz.config import load_config
+from echodataflow.viz.config import load_config, parse_config_file
+
 import datetime
 
 import numpy as np
@@ -20,6 +21,8 @@ from echodataflow.viz.viz_core import (
 )
 
 
+config_file = parse_config_file() if __name__ == "__main__" else None
+
 # Initialize extensions
 hv.extension("bokeh", enable_mathjax=True)
 hv.renderer("bokeh").theme = THEME
@@ -27,7 +30,7 @@ pn.extension()
 
 
 # Deployment settings and data files
-config = load_config("bio")
+config = load_config("bio", config_file)
 bio_var_clim = {**BIO_VAR_CLIM, **config.color_limits}
 
 for basemap in (config.grid_basemap, config.track_basemap):

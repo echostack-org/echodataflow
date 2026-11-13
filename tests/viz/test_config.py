@@ -27,6 +27,21 @@ def test_relative_cache_and_defaults(tmp_path):
     assert config.tricolor_channels == ["120", "38", "18"]
 
 
+@pytest.mark.parametrize("env_value", [None, ""])
+def test_config_path_required(monkeypatch, env_value):
+    if env_value is None:
+        monkeypatch.delenv("ECHODATAFLOW_VIZ_CONFIG", raising=False)
+    else:
+        monkeypatch.setenv("ECHODATAFLOW_VIZ_CONFIG", env_value)
+    with pytest.raises(ValueError, match="pass --config-file"):
+        load_config("echogram")
+
+
+def test_explicit_path_overrides_environment(tmp_path, monkeypatch):
+    monkeypatch.setenv("ECHODATAFLOW_VIZ_CONFIG", str(tmp_path / "missing.yaml"))
+    assert load_config("echogram", write_config(tmp_path)).cache_dir == tmp_path
+
+
 @pytest.mark.parametrize("overrides, message", [
     ({"tricolor_channels": ["18", "38"]}, "at least 3"),
     ({"tricolor_channels": ["18", "38", "200"]}, "selected from"),

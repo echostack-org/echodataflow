@@ -1,19 +1,13 @@
 # Echodataflow
 
-Echodataflow provides recipe-driven orchestration for echosounder data processing workflows.
-It combines [Prefect](https://www.prefect.io/), YAML deployment recipes, and tools
-such as [Echopype](https://github.com/echostack-org/echopype) to run workflows on different
-computing infrastructures.
+Echodataflow provides recipe-driven orchestration for echosounder data processing pipelines. It combines [Prefect](https://www.prefect.io/), YAML deployment recipes, and tools such as [Echopype](https://github.com/echostack-org/echopype) to run pipelines on different computing infrastructures.
 
 
-Check out example recipes hosted on the companion repository
-[echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes).
+Check out example recipes hosted on the companion repository [echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes).
 
 
 :::{note}
-Echodataflow `v0.1.x` is deprecated. We are currently preparing for the `v0.2.0` release,
-which contains a redesigned architecture and more straightforward mechanisms to add workflow
-components.
+Echodataflow `v0.1.x` is deprecated. We are currently preparing for the `v0.2.0` release, which contains a redesigned architecture and more straightforward mechanisms to add pipline components.
 :::
 
 
@@ -25,8 +19,7 @@ Echodataflow is currently developed and maintained by by Wu-Jung Lee ([@leewujun
 
 
 ## Funding acknowledgement
-We thank funding support from the NOAA Northwest Fisheries Science Center and the 
-Active Acoustics Strategic Inititave (AA-SI) to the development of Echodataflow.
+We thank funding support from the NOAA Northwest Fisheries Science Center and the Active Acoustics Strategic Inititave (AA-SI) to the development of Echodataflow.
 
 :::{image} https://upload.wikimedia.org/wikipedia/commons/7/79/NOAA_logo.svg
 :alt: NOAA
