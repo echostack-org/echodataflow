@@ -1,4 +1,4 @@
-# Near-real-time edge-to-cloud integration of acoustic and trawl data
+# Edge-to-cloud integration of acoustic and trawl data
 
 ## Overview
 
