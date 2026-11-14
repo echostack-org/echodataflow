@@ -40,6 +40,7 @@ Once the server and the worker are running, you can open the Prefect dashboard [
 
 ### 3. Deploy the edge workflows
 
+#### Obtain recipes and resources
 To deploy the edge workflows, we first make sure we have the recipes and resources ready:
 - Clone the [`echodataflow-recipes`] repository:
     ```shell
@@ -49,7 +50,26 @@ To deploy the edge workflows, we first make sure we have the recipes and resourc
     The `recipes_nrt/edge2cloud_hake` folder in the cloned repository has the necessary [deployment and parameters recipes](overview_recipes) and a list of cloud raw file paths in the `resources/` subfolder/
 - Download the echogram segmentation model that detects hake: download `hake_model.zip` from the GitHub [release asset](https://github.com/echostack-org/echodataflow-recipes/releases/tag/data-v1), unzip and put the content `hake_model.ckpt` under `recipes_nrt/edge2cloud_hake/resources`.
 
-Then we can deploy the edge workflows by running below in another terminal:
+
+#### Configure file upload destination
+In a terminal, run `rclone config` and follow the [rclone configuration guide](https://rclone.org/commands/rclone_config/) to create a remote for your cloud storage, or use an existing rclone remote. Run this under the same user account that runs the edge worker so the upload flow can access the `rclone.conf` file.
+
+In `recipes_nrt/edge2cloud_hake/edge/params.yaml`, set `file_upload_acoustics.dest_dir` using the rclone format `REMOTE:BUCKET/PREFIX`:
+```yaml
+flows:
+  file_upload_acoustics:
+    dest_dir: aws_hake:your-s3-bucket/edge2cloud_upload_acoustics
+```
+Here, `aws_hake` is the remote name configured in your `rclone.conf` for AWS S3, and `your-s3-bucket` is your actual bucket name. Configure the trawl upload destination in the same way:
+```yaml
+flows:
+  file_upload_trawl:
+    dest_dir: aws_hake:your-s3-bucket/edge2cloud_upload_trawl
+```
+
+
+#### Deploy the edhe workflows
+Now we can deploy the edge workflows by running below in another terminal:
 ```shell
 # switch to the recipes repo folder
 cd TEST_DIRECTORY/echodataflow-recipes
