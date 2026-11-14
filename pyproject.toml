@@ -49,6 +49,7 @@ dependencies = [
     "fastapi<0.151",  # Preserve request-body defaults required by Prefect 3.8.4
     "pyarrow",
     "pydantic>=2,<3",
+    "pyserial>=3.5",
     "PyYAML",
     "s3fs",
     "shapely",
@@ -62,7 +63,7 @@ dynamic = ["version"]
 [project.optional-dependencies]
 mission = [
     "echopype==0.12.0",
-    "echoshader==0.2.1",
+    "echoshader==0.2.3",
     "echoregions==0.2.4",
     "opencv-python",
     "dask-image",
