@@ -103,6 +103,7 @@ Once the orchestration server and the computing infrastructure are set up, a pip
 
 ```shell
 echodataflow-deploy run \
-  --deploy-spec deploy_pipeline.yaml \
-  --param-config params_pipeline.yaml
+  --default-work-pool-name local \  # work pool name
+  --deploy-spec deploy_pipeline.yaml \  # deployment recipe
+  --param-config params_pipeline.yaml  # parameters recipe
 ```

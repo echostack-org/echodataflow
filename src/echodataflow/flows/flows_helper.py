@@ -25,6 +25,10 @@ def flow_file_upload(
     max_age : int, optional
         Maximum age of files to upload in hours, by default -1 (no limit).
     """
+    if not Path(src_dir).exists():
+        print(f"Skipping file upload: source directory does not exist: {src_dir}")
+        return
+
     # TODO: need to fix dependency issue
     # TODO: consider moving it back to top imports
     from prefect_shell import ShellOperation
