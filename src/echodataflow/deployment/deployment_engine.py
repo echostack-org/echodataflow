@@ -215,7 +215,7 @@ def _compute_time_offset_seconds(flow_start_time: str | None) -> float:
         return 0.0
 
     curr_time_offset = datetime.datetime.now(
-        datetime.timezone.utc
+        datetime.UTC
     ) - datetime.datetime.fromisoformat(flow_start_time).astimezone(datetime.timezone.utc)
     return curr_time_offset.total_seconds()
 

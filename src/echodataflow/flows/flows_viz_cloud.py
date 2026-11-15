@@ -34,7 +34,7 @@ def flow_update_cache_MVBS(
     logger = get_run_logger()
 
     # Set end_time to current time - time_offset_seconds
-    end_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+    end_time = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
         seconds=time_offset_seconds
     )
 
@@ -145,7 +145,7 @@ def flow_update_cache_contours(
     logger = get_run_logger()
 
     # Set end time
-    end_time = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+    end_time = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
         seconds=time_offset_seconds
     )
 

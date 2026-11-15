@@ -5,7 +5,7 @@ import pandas as pd
 
 
 def round_up_mins(dt: datetime.datetime, slice_mins: int) -> datetime.datetime:
-    """Round down datetime to nearest interval minutes.
+    """Round up datetime to nearest interval minutes.
     
     Parameters
     ----------

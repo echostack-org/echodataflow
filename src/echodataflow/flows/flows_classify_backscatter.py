@@ -74,7 +74,8 @@ async def flow_classify_backscatter(
 
     # Set end_time to current time - time_offset_seconds
     end_time = round_up_mins(
-        datetime.datetime.now() - datetime.timedelta(seconds=time_offset_seconds),
+        datetime.datetime.now(datetime.UTC)
+        - datetime.timedelta(seconds=time_offset_seconds),
         slice_mins=slice_mins,
     ).astimezone(
         datetime.timezone.utc
