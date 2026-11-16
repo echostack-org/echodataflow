@@ -53,7 +53,7 @@ For quick local testing, start a Prefect server and a work pool in separate term
 Open the Prefect dashboard at <http://127.0.0.1:4200> to monitor flow runs. Keep the server and worker running while testing deployments.
 
 
-:::{admonition}
+:::{tip}
 :class: tip
 For operational deployments from a local machine, the server and the worker can be run via system services so that they start automatically on boot. See [](infrastructure-system-services) for details.
 :::
