@@ -10,11 +10,15 @@ project:
     - title: User guide
       children:
         - file: installation.md
-        - file: overview.md
+        - file: how_echodataflow_works.md
+          children:
+            - title: Orchestration options
+              children:
+              - file: system_services.md
+              - file: prefect_cloud.md
         - file: recipe_spec.md
         - file: package_structure.md
         - file: add_flow.md
-        - file: system_services.md
     - title: Pipeline examples
       file: pipeline_examples.md
       children:
