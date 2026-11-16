@@ -12,7 +12,7 @@ project:
         - file: installation.md
         - file: how_echodataflow_works.md
           children:
-            - title: Other deployment options
+            - title: Orchestration options
               children:
               - file: system_services.md
               - file: prefect_cloud.md
