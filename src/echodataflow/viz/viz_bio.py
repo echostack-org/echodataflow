@@ -40,7 +40,7 @@ for basemap in (config.grid_basemap, config.track_basemap):
 
 # Define length count app widgets
 update_text_length_count = pn.pane.Markdown(
-    f"Length histograms last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    f"Length histograms last updated: {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S %Z (%z)')}\n"
 )
 
 # Hidden widget for forcing plot refresh
@@ -102,7 +102,7 @@ def length_count_app():
             # Use hidden button to trigger plot_grid_map to run again
             refresh_button_length_count.param.trigger("value")  # This triggers plot_grid_map to run again
             update_text_length_count.object = (
-                f"Length histograms last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"Length histograms last updated: {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S %Z (%z)')}\n"
             )
             print("Length histograms updated at scheduled interval")
         except Exception as e:
@@ -132,7 +132,7 @@ def length_count_app():
 # Axis scale selector for length-weight app
 log_selector_length_weight = pn.widgets.RadioButtonGroup(name="Axis Scale", options=["lin-lin", "log-log"], value="log-log")
 update_text_length_weight = pn.pane.Markdown(
-    f"Length-weight scatter last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    f"Length-weight scatter last updated: {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S %Z (%z)')}\n"
 )
 refresh_button_length_weight = pn.widgets.Button(name="Refresh", visible=False)
 
@@ -191,7 +191,7 @@ def length_weight_app():
         try:
             refresh_button_length_weight.param.trigger("value")
             update_text_length_weight.object = (
-                f"Length-weight scatter last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"Length-weight scatter last updated: {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S %Z (%z)')}\n"
             )
             print("Length-weight scatter plot updated at scheduled interval")
         except Exception as e:
@@ -231,7 +231,7 @@ def clean_cells(
 
 # Define widgets
 update_text_grid_app = pn.pane.Markdown(
-    f"Grid map last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    f"Grid map last updated: {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S %Z (%z)')}\n"
 )
 
 bio_var_selector_grid_map = pn.widgets.Select(
@@ -347,7 +347,7 @@ def grid_app():
             # Use hidden button to trigger plot_grid_map to run again
             refresh_button_grid_map.param.trigger("value")
             update_text_grid_app.object = (
-                f"Grid map last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"Grid map last updated: {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S %Z (%z)')}\n"
             )
             print("Grid map updated at scheduled interval")
         except Exception as e:
@@ -375,7 +375,7 @@ def grid_app():
 
 # Define widgets
 update_text_track_app = pn.pane.Markdown(
-    f"Track map last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    f"Track map last updated: {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S %Z (%z)')}\n"
 )
 
 bio_var_selector_track_map = pn.widgets.Select(
@@ -522,7 +522,7 @@ def track_app():
             # Use hidden button to trigger plot_grid_map to run again
             refresh_button_track_map.param.trigger("value")
             update_text_track_app.object = (
-                f"Track map last updated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"Track map last updated: {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d %H:%M:%S %Z (%z)')}\n"
             )
             print("Track map updated at scheduled interval")
         except Exception as e:

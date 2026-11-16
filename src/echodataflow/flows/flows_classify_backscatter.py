@@ -74,7 +74,8 @@ async def flow_classify_backscatter(
 
     # Set end_time to current time - time_offset_seconds
     end_time = round_up_mins(
-        datetime.datetime.now() - datetime.timedelta(seconds=time_offset_seconds),
+        datetime.datetime.now(datetime.UTC)
+        - datetime.timedelta(seconds=time_offset_seconds),
         slice_mins=slice_mins,
     ).astimezone(
         datetime.timezone.utc
@@ -101,7 +102,11 @@ async def flow_classify_backscatter(
     path_prediction_evr = Path(path_main) / "EVR"
     path_NASC_zarr = Path(path_main) / "NASC"
     if not path_MVBS_zarr.exists():
-        raise ValueError("MVBS zarr store does not exist, check create_MVBS flow!")
+        logger.info(
+            "MVBS zarr store does not exist yet; skipping prediction. "
+            "Check create_MVBS flow."
+        )
+        return
     if not path_prediction_zarr.exists():
         path_prediction_zarr.mkdir(parents=True, exist_ok=True)
     if not path_prediction_evr.exists():

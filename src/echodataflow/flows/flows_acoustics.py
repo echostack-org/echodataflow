@@ -246,11 +246,16 @@ async def flow_create_MVBS(
 
     # Set end_time to current time - time_offset_seconds
     end_time = round_up_mins(
-        datetime.datetime.now() - datetime.timedelta(seconds=time_offset_seconds),
+        datetime.datetime.now(datetime.UTC)
+        - datetime.timedelta(seconds=time_offset_seconds),
         slice_mins=slice_mins,
     ).astimezone(
         datetime.timezone.utc
     )  # convert to UTC
+
+    print(f"now time = {datetime.datetime.now(datetime.UTC)}")
+    print(f"offset seconds = {datetime.timedelta(seconds=time_offset_seconds)}")
+    print(f"end time = {end_time}")
 
     logger.info(
         "flow started with parameters:\n"

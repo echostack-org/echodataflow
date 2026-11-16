@@ -25,6 +25,12 @@ def flow_file_upload(
     max_age : int, optional
         Maximum age of files to upload in hours, by default -1 (no limit).
     """
+
+    src_dir = Path(src_dir).expanduser().resolve()  # resolve to absolute path
+    if not Path(src_dir).exists():
+        print(f"Skipping file upload: source directory does not exist: {src_dir}")
+        return
+
     # TODO: need to fix dependency issue
     # TODO: consider moving it back to top imports
     from prefect_shell import ShellOperation
@@ -35,6 +41,7 @@ def flow_file_upload(
         f"{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d_%H%M%S')}.txt"
     )
     exclude_path = Path(src_dir) / exclude_filename
+    print(f"exclusion list file: {exclude_path}")
     with open(exclude_path, "w") as file:
         # Add .DS_Store to exclude list
         file.write(".DS_Store\n")
