@@ -1,7 +1,7 @@
-(deployment-system-services)=
-# Deployment system services
+(infrastructure-system-services)=
+# Infrastructure system services
 
-Echodataflow requires a Prefect server and workers in work pools to deploy a pipeline. While it is possible to deploy a pipeline by running a server and workers [simply via terminal](server-workpool-terminal), it is more robust to run them as long-running processes via system services in the operating system (OS) so that the processes will restart automatically if system crashes.
+Echodataflow requires a Prefect server and workers in work pools to deploy a pipeline. While it is possible to deploy a pipeline by running a server and workers [simply via terminal](overview_simple-setup), it is more robust to run them as long-running processes via system services in the operating system (OS) so that the processes will restart automatically if system crashes.
 
 In the sections we explain the mechanism we use to run a server and a worker as system services on a machine running MacOS.
 

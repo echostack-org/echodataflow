@@ -31,7 +31,7 @@ conda activate echodataflow
 
 ### 2. Run edge Prefect server and worker
 
-Follow [](overview_local-setup) to run a Prefect server and a worker on two terminals on a local machine (this is the "edge"). Keep these two terminals running when you try to run the workflow.
+Follow [](overview_simple-setup) to run a Prefect server and a worker on two terminals on a local machine (this is the "edge"). Keep these two terminals running when you try to run the workflow.
 
 Once the server and the worker are running, you can open the Prefect dashboard [http://127.0.0.1:4200](http://127.0.0.1:4200) and check that a worker is online under **Work Pools → local → Workers**.
 
