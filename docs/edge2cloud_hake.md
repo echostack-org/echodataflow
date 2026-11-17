@@ -51,20 +51,43 @@ To deploy the edge workflows, we first make sure we have the recipes and resourc
 - Download the echogram segmentation model that detects hake: download `hake_model.zip` from the GitHub [release asset](https://github.com/echostack-org/echodataflow-recipes/releases/tag/data-v1), unzip and put the content `hake_model.ckpt` under `recipes_nrt/edge2cloud_hake/resources`.
 
 
+(rclone_config)=
 #### Configure file upload destination
-In a terminal, run `rclone config` and follow the [rclone configuration guide](https://rclone.org/commands/rclone_config/) to create a remote for your cloud storage, or use an existing rclone remote. Run this under the same user account that runs the edge worker so the upload flow can access the `rclone.conf` file.
+In a terminal, run `rclone config` and follow the [rclone configuration guide](https://rclone.org/commands/rclone_config/) to create a remote for your cloud storage, or use an existing rclone remote.
 
-In `recipes_nrt/edge2cloud_hake/edge/params.yaml`, set `file_upload_acoustics.dest_dir` using the rclone format `REMOTE:BUCKET/FOLDER`:
+In the parameters recipe `recipes_nrt/edge2cloud_hake/edge/params.yaml`, the cloud storage location where we will upload data to should be specified in the form `remote:bucket/path/to/dir`.  There should be a corresponding `remote` section in `rclone.conf`. Run `rclone config file` to find the location of this configuration file.
+
+The `remote` section should be an S3 remote section with explicit `access_key_id` and `secret_access_key` values.
+For AWS S3, this would look like:
+```ini
+[aws_remote]
+type = s3
+provider = AWS
+access_key_id = YOUR_ACCESS_KEY
+secret_access_key = YOUR_SECRET_KEY
+region = us-west-2
+```
+
+For OSN, this would look like:
+
+```ini
+[osn_remote]
+type = s3
+provider = Ceph
+access_key_id = YOUR_ACCESS_KEY
+secret_access_key = YOUR_SECRET_KEY
+endpoint = https://sdsc.osn.xsede.org
+```
+
+Once rclone is configured, in `recipes_nrt/edge2cloud_hake/edge/params.yaml`, set `dest_dir` for both the acoustic and trawl data upload destination using the rclone format `remote:bucket/path/to/dir`:
 ```yaml
 flows:
   file_upload_acoustics:
-    dest_dir: aws_hake:your-s3-bucket/edge2cloud_upload_acoustics
-```
-Here, `aws_hake` is the remote name configured in your `rclone.conf` for AWS S3, and `your-s3-bucket` is your actual bucket name. Configure the trawl upload destination in the same way:
-```yaml
-flows:
+    dest_dir: aws_remote:my_bucket/test_data/acoustics
+    ...
   file_upload_trawl:
-    dest_dir: aws_hake:your-s3-bucket/edge2cloud_upload_trawl
+    dest_dir: aws_remote:my_bucket/test_data/trawl
+    ...
 ```
 
 
@@ -162,22 +185,23 @@ Similar to the local Prefect dashboard, open your workspace in the [Prefect Clou
 
 
 #### Configure cloud data product locations
-Similar to what we did to run the edge workflows, we need to config rclone to create a remote for the cloud storage location where we had set the edge workflows to upload data to.
+Similar to what we did on the edge machine, we need to [config rclone](rclone_config) with a remote for the cloud storage location containing data uplaoded from the edge.
 
-In `recipes_nrt/edge2cloud_hake/cloud/params.yaml`:
-- point `path_bio_files`, `path_NASC_files`, and `path_MVBS` to the cloud bucket location, for example:
-  ```yaml
-  flows:
-    ingest_haul:
-      path_bio_files: my_bucket/test_data/trawl
-      ...
-    ingest_NASC:
-      path_NASC_files: my_bucket/test_data/acoustics/NASC
-      ...
-    update_cache_MVBS:
-      path_MVBS: my_bucket/test_data/acoustics/MVBS
-  ```
-- point `cred_file` to the location where your `rclone.conf` files is located. You can find its location by running `rclone config file` in a terminal
+Once rclone is configured, in `recipes_nrt/edge2cloud_hake/cloud/params.yaml`, set the input paths to match the edge upload destinations using the rclone format `remote:bucket/path/to/dir`:
+
+```yaml
+flows:
+  ingest_haul:
+    path_bio_files: aws_remote:my_bucket/test_data/trawl
+    ...
+  ingest_NASC:
+    path_NASC_files: aws_remote:my_bucket/test_data/acoustics/NASC
+    ...
+  update_cache_MVBS:
+    path_MVBS: aws_remote:my_bucket/test_data/acoustics/MVBS
+    ...
+```
+
 
 
 #### Deploy cloud workflows
