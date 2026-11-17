@@ -7,7 +7,7 @@ Check out example recipes hosted on the companion repository [echodataflow-recip
 
 
 :::{note}
-Echodataflow `v0.1.x` is deprecated. We are currently preparing for the `v0.2.0` release, which contains a redesigned architecture and more straightforward mechanisms to add pipline components.
+Echodataflow `v0.1.x` is deprecated. Version `v0.2.0` introduces a redesigned architecture and more straightforward mechanisms to add pipeline components.
 :::
 
 
