@@ -1,20 +1,17 @@
 [Unit]
-Description=Deploy Prefect worker in work-pool local
-After=network.target
+Description=Echodataflow Prefect worker
+After=deploy_prefect_server.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
-WorkingDirectory=/home/exouser
-Environment=PATH=/home/exouser/miniforge3/condabin:/usr/local/bin:/usr/bin:/bin
-EnvironmentFile=-/home/exouser/.config/echodataflow/services.env
-ExecStart=/usr/bin/env bash -lc '"${MAMBA_BIN}" run -n "${ECHODATAFLOW_ENV}" prefect worker start --pool "${PREFECT_POOL}"'
+ExecStart=/bin/bash %h/.config/echodataflow/run_prefect_worker.sh
 Restart=always
 RestartSec=30
-StartLimitInterval=300
-StartLimitBurst=5
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=echodataflow_prefect_worker
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
