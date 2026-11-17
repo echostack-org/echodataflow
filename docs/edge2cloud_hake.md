@@ -42,33 +42,56 @@ Once the server and the worker are running, you can open the Prefect dashboard [
 
 #### Obtain recipes and resources
 To deploy the edge workflows, we first make sure we have the recipes and resources ready:
-- Clone the [`echodataflow-recipes`] repository:
+- Clone the [echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes) repository:
     ```shell
     cd TEST_DIRECTORY  # switch into a test directory
     git clone https://github.com/echostack-org/echodataflow-recipes.git
     ```
-    The `recipes_nrt/edge2cloud_hake` folder in the cloned repository has the necessary [deployment and parameters recipes](overview_recipes) and a list of cloud raw file paths in the `resources/` subfolder/
+    The `recipes_nrt/edge2cloud_hake` folder in the cloned repository has the necessary [deployment and parameters recipes](overview_recipes) and other necessary files in the `resources/` subfolder
 - Download the echogram segmentation model that detects hake: download `hake_model.zip` from the GitHub [release asset](https://github.com/echostack-org/echodataflow-recipes/releases/tag/data-v1), unzip and put the content `hake_model.ckpt` under `recipes_nrt/edge2cloud_hake/resources`.
 
 
+(rclone_config)=
 #### Configure file upload destination
-In a terminal, run `rclone config` and follow the [rclone configuration guide](https://rclone.org/commands/rclone_config/) to create a remote for your cloud storage, or use an existing rclone remote. Run this under the same user account that runs the edge worker so the upload flow can access the `rclone.conf` file.
+In a terminal, run `rclone config` and follow the [rclone configuration guide](https://rclone.org/commands/rclone_config/) to create a remote for your cloud storage, or use an existing rclone remote.
 
-In `recipes_nrt/edge2cloud_hake/edge/params.yaml`, set `file_upload_acoustics.dest_dir` using the rclone format `REMOTE:BUCKET/PREFIX`:
+In the parameters recipe `recipes_nrt/edge2cloud_hake/edge/params.yaml`, the cloud storage location where we will upload data to should be specified in the form `remote:bucket/path/to/dir`.  There should be a corresponding `remote` section in `rclone.conf`. Run `rclone config file` to find the location of this configuration file.
+
+The `remote` section should be an S3 remote section with explicit `access_key_id` and `secret_access_key` values.
+For AWS S3, this would look like:
+```ini
+[aws_remote]
+type = s3
+provider = AWS
+access_key_id = YOUR_ACCESS_KEY
+secret_access_key = YOUR_SECRET_KEY
+region = us-west-2
+```
+
+For OSN, this would look like:
+
+```ini
+[osn_remote]
+type = s3
+provider = Ceph
+access_key_id = YOUR_ACCESS_KEY
+secret_access_key = YOUR_SECRET_KEY
+endpoint = https://sdsc.osn.xsede.org
+```
+
+Once rclone is configured, in `recipes_nrt/edge2cloud_hake/edge/params.yaml`, set `dest_dir` for both the acoustic and trawl data upload destination using the rclone format `remote:bucket/path/to/dir`:
 ```yaml
 flows:
   file_upload_acoustics:
-    dest_dir: aws_hake:your-s3-bucket/edge2cloud_upload_acoustics
-```
-Here, `aws_hake` is the remote name configured in your `rclone.conf` for AWS S3, and `your-s3-bucket` is your actual bucket name. Configure the trawl upload destination in the same way:
-```yaml
-flows:
+    dest_dir: aws_remote:my_bucket/test_data/acoustics
+    ...
   file_upload_trawl:
-    dest_dir: aws_hake:your-s3-bucket/edge2cloud_upload_trawl
+    dest_dir: aws_remote:my_bucket/test_data/trawl
+    ...
 ```
 
 
-#### Deploy the edhe workflows
+#### Deploy the edge workflows
 Now we can deploy the edge workflows by running below in another terminal:
 ```shell
 # switch to the recipes repo folder
@@ -87,15 +110,15 @@ Once the command runs through, explore the local Prefect dashboard [http://127.0
 
 
 
-### 4. Run cloud Prefect worker and connect to Prefect Cloud
+### 4. Connect to Prefect Cloud and run a worker
 
-To run the cloud workflows, we first make sure we have the environment and Prefect Cloud workspace ready:
-- configure and start a cloud VM
-- on the cloud VM, follow step 1 to install and activate an echodataflow environment, and clone the `echodataflow-recipes` repository following step 3.
-- separately, create an account and workspace on [Prefect Cloud](https://app.prefect.cloud/), or use an existing workspace.
+To run the cloud workflows, we first make sure we have the environment and Prefect Cloud workspace ready by doing the following:
+- Configure and start a cloud VM
+- On the cloud VM, follow step 1 to install and activate an echodataflow environment, and clone the `echodataflow-recipes` repository following the beginning of step 3.
+- Separately, create an account and workspace on [Prefect Cloud](https://app.prefect.cloud/), or use an existing workspace.
 
 #### Connect to Prefect Cloud
-Then we can connect to Prefect Cloud by running below in another terminal on the cloud VM:
+Then we can connect to Prefect Cloud by running below in a terminal on the cloud VM:
 ```shell
 # activate the echodataflow environment
 conda activate echodataflow
@@ -103,43 +126,82 @@ conda activate echodataflow
 # create a local configuration profile named my_cloud
 prefect profile create my_cloud
 
-# logs in on Prefect Cloud and saves connection settings in my_cloud
-# follow prompts to authenticate with a web browser or an API key
-prefect --profile my_cloud cloud login
+# switch to use the my_cloud profile
+prefect profile use my_cloud
 
-# select the workspace for my_cloud
-# replace `<account-handle>/<workspace-handle>` with your account and workspace handles
-prefect --profile my_cloud cloud workspace set --workspace "<account-handle>/<workspace-handle>"
+# logs in on Prefect Cloud and create an API key
+# and then login using the API key
+prefect cloud login -k API_KEY
+
+# list the available workspaces to this API key
+prefect --profile my_cloud cloud workspace ls
+
+# select the workspace for my_cloud by specifying one of the workspaces above
+prefect --profile my_cloud cloud workspace set --workspace "ACCOUNT_HANDLE/WORKSPACE_HANDLE"
 ```
+
+You can also select the workspace (the last step) interactively by:
+```shell
+# set your workspace interactively
+prefect --profile my_cloud cloud workspace set
+```
+
 
 :::{note}
 The `my_cloud` profile is a local configuration that stores connection settings for your Prefect Cloud workspace. It is separate from the account and workspace created on Prefect Cloud. See the [Prefect Cloud connection guide](https://docs.prefect.io/v3/how-to-guides/cloud/connect-to-cloud) for details.
 :::
 
+:::{tip}
+The following Prefect commands may come in handy:
+```shell
+# view the current configuration
+prefect config view
 
-#### Run a worker in the `cloud-local` work pool
+# view available profiles
+prefect profile ls
+```
+:::
+
+
+
+#### Run a worker
 After establishing the Prefect Cloud connection above, run the following on the cloud VM to create the `cloud-local` work pool (as specified in `recipes_nrt/edge2cloud_hake/cloud/deploy.yaml`) and start a worker for it:
 ```shell
 # create the work pool "cloud-local" and start a worker
 prefect --profile my_cloud worker start --pool cloud-local --type process
 ```
-Keep this terminal running while using the workflow. 
-
-
-#### Check Prefect Cloud dashboard
-Now, Prefect Cloud can orchestrate the runs with the worker executing them on the cloud VM.
+Now, Prefect Cloud can orchestrate the runs that will be executed by this worker on the cloud VM.
 
 Similar to the local Prefect dashboard, open your workspace in the [Prefect Cloud dashboard](https://app.prefect.cloud/) and check that a worker is online under **Work Pools → cloud-local → Workers**. 
-
-Use the same `my_cloud` profile when deploying the cloud workflows in step 5 (for example, by setting `PREFECT_PROFILE=my_cloud` in the deployment terminal).
-
 
 
 
 
 ### 5. Deploy cloud workflows
 
-In another terminal on the cloud VM, activate the environment and run the deployment command from the recipes repository using the `my_cloud` profile:
+
+#### Configure cloud data product locations
+Similar to what we did on the edge machine, we need to [config rclone](rclone_config) with a remote for the cloud storage location containing data uplaoded from the edge.
+
+Once rclone is configured, in `recipes_nrt/edge2cloud_hake/cloud/params.yaml`, set the input paths to match the edge upload destinations using the rclone format `remote:bucket/path/to/dir`:
+
+```yaml
+flows:
+  ingest_haul:
+    path_bio_files: aws_remote:my_bucket/test_data/trawl
+    ...
+  ingest_NASC:
+    path_NASC_files: aws_remote:my_bucket/test_data/acoustics/NASC
+    ...
+  update_cache_MVBS:
+    path_MVBS: aws_remote:my_bucket/test_data/acoustics/MVBS
+    ...
+```
+
+
+
+#### Deploy cloud workflows
+In a terminal on the cloud VM, activate the environment and run the deployment command from the recipes repository using the `my_cloud` profile:
 ```shell
 # activate the echodataflow environment
 conda activate echodataflow
@@ -197,18 +259,17 @@ Keep both terminals running. With the default ports set in `viz.yaml`, open `htt
 For persistent operations, it is advantageous to run these visualizations as system services. In the Echodataflow package we supply `viz_echogram.service` and `viz_bio.service` templates under `src/echodataflow/viz/services` that can be run on a Linux cloud VM.
 
 To run these services. Follow the steps below:
-- Copy the environment template from the root of that repository and name it `services.env`:
+- Copy the environment template from the root of that repository and name it `viz_services.env`:
     ```shell
     mkdir -p ~/.config/echodataflow
-    cp src/echodataflow/viz/services/services.env.example_cloud \
-    ~/.config/echodataflow/services.env
+    cp src/echodataflow/viz/services/viz_services.env.example_cloud \
+      ~/.config/echodataflow/viz_services.env
     ```
-- In `services.env`, set the following variables:
-    - `ECHODATAFLOW_HOME`: your home directory
+- In `viz_services.env`, set the following variables:
     - `ECHODATAFLOW_ENV`: your echodataflow environment
-    - `MAMBA_BIN`: full path of your conda or mamba executable
+    - `ECHODATAFLOW_HOME`: your home directory
     - `ECHODATAFLOW_VIZ_CONFIG`: absolute path of `recipes_nrt/edge2cloud_hake/cloud/viz.yaml`
-    - `ECHODATAFLOW_WORKDIR`: absolute path of your echodataflow repository
+    - `MAMBA_BIN`: full path of your conda or mamba executable
 - Install `viz_echogram.service` and `viz_bio.service` as user services
     ```shell
     mkdir -p ~/.config/systemd/user
@@ -228,7 +289,7 @@ To run these services. Follow the steps below:
     ```
 
 :::{note}
-If you make changes to `services.env`, restart the apps with
+If you make changes to `viz_services.env`, restart the apps with
 ```shell
 systemctl --user restart viz_echogram.service viz_bio.service
 ```

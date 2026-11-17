@@ -1,3 +1,8 @@
+import configparser
+import subprocess
+from pathlib import Path
+
+import s3fs
 import re
 import datetime
 import numpy as np
@@ -66,3 +71,53 @@ def extract_datetime_from_filename(filename):
         time_str = match.group(2)
         return datetime.datetime.strptime(f"{date_str} {time_str}", "%Y%m%d %H%M%S").replace(tzinfo=datetime.timezone.utc)
     return None
+
+def resolve_rclone_s3_path(remote_path: str) -> tuple[s3fs.S3FileSystem, str]:
+    """Return an S3 filesystem and bucket/path for ``remote:bucket/path/to/dir``.
+    """
+    remote, separator, path = remote_path.partition(":")
+    if path.startswith("//"):
+        raise ValueError("Expected an rclone path in the form remote:bucket/path/to/dir")
+    path = path.lstrip("/").rstrip("/")
+    if not separator or not remote.strip() or not path or path.startswith(":"):
+        raise ValueError("Expected an rclone path in the form remote:bucket/path/to/dir")
+
+    result = subprocess.run(
+        ["rclone", "config", "file"],
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+        timeout=30,
+    )
+
+    lines = result.stdout.strip().splitlines()
+    if not lines:
+        raise RuntimeError("rclone did not return a config file location")
+    config_path = Path(lines[-1]).expanduser()
+    config = configparser.ConfigParser(interpolation=None)
+    with config_path.open() as stream:
+        config.read_file(stream)
+
+    if remote not in config:
+        raise ValueError(f"Remote {remote!r} is missing from the rclone config")
+    section = config[remote]
+    if section.get("type", "").lower() != "s3":
+        raise ValueError(f"Remote {remote!r} must be an S3 remote")
+
+    # Require explicit credentials from the selected rclone remote.
+    key = section.get("access_key_id")
+    secret = section.get("secret_access_key")
+    if not key or not secret:
+        raise ValueError(f"Remote {remote!r} must provide both S3 credential fields")
+    client_kwargs = {}
+    for source, target in (("endpoint", "endpoint_url"), ("region", "region_name")):
+        if section.get(source):
+            client_kwargs[target] = section[source]
+    fs = s3fs.S3FileSystem(
+        key=key,
+        secret=secret,
+        token=section.get("session_token"),
+        anon=False,
+        client_kwargs=client_kwargs,
+    )
+    return fs, path

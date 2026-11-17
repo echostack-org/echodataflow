@@ -1,11 +1,11 @@
-import configparser
 import datetime
 import tempfile
 from pathlib import Path
 
+from echodataflow.utils.utils import resolve_rclone_s3_path
+
 import echoregions as er
 import pandas as pd
-import s3fs
 import xarray as xr
 from echodataflow.operations.cps_transect_cache import prepare_transect_caches
 from echodataflow.utils.processing_ledger import (
@@ -21,7 +21,6 @@ def flow_update_cache_MVBS(
     slice_mins: int = 180,
     path_cache: str = "PATH_TO_DATA_CACHE",
     path_MVBS: str = "PATH_TO_MVBS_DATA_STORE",
-    cred_file: str = "PATH_TO_CREDENTIALS_FILE",
     file_MVBS_csv: str = "MVBS_files.csv",
     file_MVBS_zarr: str = "latest_MVBS.zarr",
 ):
@@ -42,13 +41,7 @@ def flow_update_cache_MVBS(
     )
 
     # Get cloud bucket
-    config = configparser.ConfigParser()
-    config.read(cred_file)
-    fs = s3fs.S3FileSystem(
-        key=config["osn_sdsc_hake"]["access_key_id"],
-        secret=config["osn_sdsc_hake"]["secret_access_key"],
-        client_kwargs={"endpoint_url": config["osn_sdsc_hake"]["endpoint"]},
-    )
+    fs, path_MVBS = resolve_rclone_s3_path(path_MVBS)
 
     # Get all MVBS files in the bucket
     MVBS_all = fs.glob(f"{path_MVBS}/*.zarr")
@@ -135,7 +128,6 @@ def flow_update_cache_contours(
     slice_mins: int = 180,
     path_cache: str = "PATH_TO_DATA_CACHE",
     path_EVR: str = "PATH_TO_EVR_DATA_STORE",
-    cred_file: str = "PATH_TO_CREDENTIALS_FILE",
     file_contours_csv: str = "latest_contours.csv",
 ):
     logger = get_run_logger()
@@ -157,13 +149,7 @@ def flow_update_cache_contours(
     )
 
     # Get cloud bucket
-    config = configparser.ConfigParser()
-    config.read(cred_file)
-    fs = s3fs.S3FileSystem(
-        key=config["osn_sdsc_hake"]["access_key_id"],
-        secret=config["osn_sdsc_hake"]["secret_access_key"],
-        client_kwargs={"endpoint_url": config["osn_sdsc_hake"]["endpoint"]},
-    )
+    fs, path_EVR = resolve_rclone_s3_path(path_EVR)
 
     # Find EVR files
     evr_files = fs.glob(f"{path_EVR}/*.evr")

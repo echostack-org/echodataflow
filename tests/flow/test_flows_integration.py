@@ -11,9 +11,9 @@ def test_flow_ingest_NASC_waits_for_stratum_estimates(monkeypatch, tmp_path):
         lambda: SimpleNamespace(info=messages.append),
     )
     monkeypatch.setattr(
-        flows_integration.s3fs,
-        "S3FileSystem",
-        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("S3 should not be accessed")),
+        flows_integration,
+        "resolve_rclone_s3_path",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("S3 should not be accessed")),
     )
 
     result = flows_integration.flow_ingest_NASC.fn(path_vm_local=str(tmp_path))
