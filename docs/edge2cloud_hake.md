@@ -68,7 +68,7 @@ flows:
 ```
 
 
-#### Deploy the edhe workflows
+#### Deploy the edge workflows
 Now we can deploy the edge workflows by running below in another terminal:
 ```shell
 # switch to the recipes repo folder
@@ -89,13 +89,13 @@ Once the command runs through, explore the local Prefect dashboard [http://127.0
 
 ### 4. Run cloud Prefect worker and connect to Prefect Cloud
 
-To run the cloud workflows, we first make sure we have the environment and Prefect Cloud workspace ready:
-- configure and start a cloud VM
-- on the cloud VM, follow step 1 to install and activate an echodataflow environment, and clone the `echodataflow-recipes` repository following step 3.
-- separately, create an account and workspace on [Prefect Cloud](https://app.prefect.cloud/), or use an existing workspace.
+To run the cloud workflows, we first make sure we have the environment and Prefect Cloud workspace ready by doing the following:
+- Configure and start a cloud VM
+- On the cloud VM, follow step 1 to install and activate an echodataflow environment, and clone the `echodataflow-recipes` repository following the beginning of step 3.
+- Separately, create an account and workspace on [Prefect Cloud](https://app.prefect.cloud/), or use an existing workspace.
 
 #### Connect to Prefect Cloud
-Then we can connect to Prefect Cloud by running below in another terminal on the cloud VM:
+Then we can connect to Prefect Cloud by running below in a terminal on the cloud VM:
 ```shell
 # activate the echodataflow environment
 conda activate echodataflow
@@ -103,14 +103,26 @@ conda activate echodataflow
 # create a local configuration profile named my_cloud
 prefect profile create my_cloud
 
-# logs in on Prefect Cloud and saves connection settings in my_cloud
-# follow prompts to authenticate with a web browser or an API key
-prefect --profile my_cloud cloud login
+# switch to use the my_cloud profile
+prefect profile use my_cloud
 
-# select the workspace for my_cloud
-# replace `<account-handle>/<workspace-handle>` with your account and workspace handles
-prefect --profile my_cloud cloud workspace set --workspace "<account-handle>/<workspace-handle>"
+# logs in on Prefect Cloud and create an API key
+# and then login using the API key
+prefect cloud login -k API_KEY
+
+# list the available workspaces to this API key
+prefect --profile my_cloud cloud workspace ls
+
+# select the workspace for my_cloud by specifying one of the workspaces above
+prefect --profile my_cloud cloud workspace set --workspace "ACCOUNT_HANDLE/WORKSPACE_HANDLE"
 ```
+
+You can also select the workspace (the last step) interactively by:
+```shell
+# set your workspace interactively
+prefect --profile my_cloud cloud workspace set
+```
+
 
 :::{note}
 The `my_cloud` profile is a local configuration that stores connection settings for your Prefect Cloud workspace. It is separate from the account and workspace created on Prefect Cloud. See the [Prefect Cloud connection guide](https://docs.prefect.io/v3/how-to-guides/cloud/connect-to-cloud) for details.
@@ -130,9 +142,6 @@ Keep this terminal running while using the workflow.
 Now, Prefect Cloud can orchestrate the runs with the worker executing them on the cloud VM.
 
 Similar to the local Prefect dashboard, open your workspace in the [Prefect Cloud dashboard](https://app.prefect.cloud/) and check that a worker is online under **Work Pools → cloud-local → Workers**. 
-
-Use the same `my_cloud` profile when deploying the cloud workflows in step 5 (for example, by setting `PREFECT_PROFILE=my_cloud` in the deployment terminal).
-
 
 
 
