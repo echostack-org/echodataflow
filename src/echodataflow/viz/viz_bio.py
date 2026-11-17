@@ -66,7 +66,7 @@ def plot_length_count(refresh) -> hv.Overlay:
     # Create overlay
     plots = []
     for sex in sex_options:
-        overlay = None
+        histograms = []
         for stratum in stratum_options:
             df_sub = df_len_cnt_all[(df_len_cnt_all["sex"] == sex) & (df_len_cnt_all["stratum"] == stratum)]
             if not df_sub.empty:
@@ -77,9 +77,9 @@ def plot_length_count(refresh) -> hv.Overlay:
                     height=250, width=650,
                     xlabel="Fork Length (cm)",
                 )
-                overlay = hist if overlay is None else overlay * hist
-        if overlay:
-            overlay = overlay.opts(title=f"Sex: {sex}", legend_position="right")
+                histograms.append(hist)
+        if histograms:
+            overlay = hv.Overlay(histograms).opts(title=f"Sex: {sex}", legend_position="right")
             plots.append(overlay)
     if plots:
         return hv.Layout(plots).cols(1)
