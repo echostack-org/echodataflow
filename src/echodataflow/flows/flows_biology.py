@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import configparser
 from pathlib import Path
 
+from echodataflow.utils.utils import resolve_rclone_s3_path
+
 import pandas as pd
-import s3fs
 from prefect import flow
 
 from echodataflow.operations.operations_biology import (
@@ -23,7 +23,6 @@ from echodataflow.utils.trawl_files import discover_trawl_files, get_valid_hauls
 def flow_ingest_haul(
     path_vm_local: str = "VM_LOCAL_PATH",
     path_bio_files: str = "BIO_CSV_CLOUD_LOCATION",
-    cred_file: str = "CREDENTIAL_FILE",
     file_haul_info_all: str = "haul_info_all.csv",
     file_specimen_all: str = "specimen_all.csv",
     file_length_all: str = "length_all.csv",
@@ -43,13 +42,7 @@ def flow_ingest_haul(
     stratum_mean_path = output_directory / file_stratum_mean
 
     # Connect to the S3-compatible biology data store
-    config = configparser.ConfigParser()
-    config.read(cred_file)
-    fs = s3fs.S3FileSystem(
-        key=config["osn_sdsc_hake"]["access_key_id"],
-        secret=config["osn_sdsc_hake"]["secret_access_key"],
-        client_kwargs={"endpoint_url": config["osn_sdsc_hake"]["endpoint"]},
-    )
+    fs, path_bio_files = resolve_rclone_s3_path(path_bio_files)
 
     # A haul is ready only after all four expected workbook types are present
     discovered_files = discover_trawl_files(fs, path_bio_files)

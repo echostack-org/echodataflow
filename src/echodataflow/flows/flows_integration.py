@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import configparser
 from pathlib import Path
+
+from echodataflow.utils.utils import resolve_rclone_s3_path
 
 import geopandas as gpd
 import pandas as pd
-import s3fs
 from prefect import flow, get_run_logger
 from prefect.futures import as_completed
 
@@ -28,7 +28,6 @@ from echodataflow.utils.grid import create_boundary_gdf, create_grid_from_bounds
 def flow_ingest_NASC(
     path_vm_local: str = "LOCAL_PATH_TO_INTEGRATED_DATA",
     path_NASC_files: str = "NASC_ZARR_CLOUD_LOCATION",
-    cred_file: str = "CREDENTIAL_FILE",
     file_NASC_all: str = "NASC_all.csv",
     file_stratum_mean: str = "stratum_mean.csv",
     file_NASC_all_grid: str = "NASC_all_griddify.geojson",
@@ -60,13 +59,7 @@ def flow_ingest_NASC(
     logger.info(f"NASC files already processed: {NASC_processed}")
 
     # Connect to the S3-compatible NASC data store
-    config = configparser.ConfigParser()
-    config.read(cred_file)
-    fs = s3fs.S3FileSystem(
-        key=config["osn_sdsc_hake"]["access_key_id"],
-        secret=config["osn_sdsc_hake"]["secret_access_key"],
-        client_kwargs={"endpoint_url": config["osn_sdsc_hake"]["endpoint"]},
-    )
+    fs, path_NASC_files = resolve_rclone_s3_path(path_NASC_files)
 
     NASC_available = sorted(
         Path(filename).name for filename in fs.glob(f"{path_NASC_files}/*.zarr")
