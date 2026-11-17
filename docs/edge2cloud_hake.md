@@ -42,12 +42,12 @@ Once the server and the worker are running, you can open the Prefect dashboard [
 
 #### Obtain recipes and resources
 To deploy the edge workflows, we first make sure we have the recipes and resources ready:
-- Clone the [`echodataflow-recipes`] repository:
+- Clone the [echodataflow-recipes](https://github.com/echostack-org/echodataflow-recipes) repository:
     ```shell
     cd TEST_DIRECTORY  # switch into a test directory
     git clone https://github.com/echostack-org/echodataflow-recipes.git
     ```
-    The `recipes_nrt/edge2cloud_hake` folder in the cloned repository has the necessary [deployment and parameters recipes](overview_recipes) and a list of cloud raw file paths in the `resources/` subfolder/
+    The `recipes_nrt/edge2cloud_hake` folder in the cloned repository has the necessary [deployment and parameters recipes](overview_recipes) and other necessary files in the `resources/` subfolder
 - Download the echogram segmentation model that detects hake: download `hake_model.zip` from the GitHub [release asset](https://github.com/echostack-org/echodataflow-recipes/releases/tag/data-v1), unzip and put the content `hake_model.ckpt` under `recipes_nrt/edge2cloud_hake/resources`.
 
 
