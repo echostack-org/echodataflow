@@ -52,7 +52,6 @@
     <Exec>
       <Command>__PREFECT_EXE__</Command>
       <Arguments>server start --host 127.0.0.1 --port 4200</Arguments>
-      <WorkingDirectory>__ECHODATAFLOW_WORKDIR__</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>

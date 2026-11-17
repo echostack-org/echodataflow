@@ -53,7 +53,6 @@
     <Exec>
       <Command>__PREFECT_EXE__</Command>
       <Arguments>worker start --pool __PREFECT_POOL__</Arguments>
-      <WorkingDirectory>__ECHODATAFLOW_WORKDIR__</WorkingDirectory>
     </Exec>
   </Actions>
 </Task>
