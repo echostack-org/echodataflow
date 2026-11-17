@@ -225,11 +225,10 @@ To run these services. Follow the steps below:
     ~/.config/echodataflow/services.env
     ```
 - In `services.env`, set the following variables:
-    - `ECHODATAFLOW_HOME`: your home directory
     - `ECHODATAFLOW_ENV`: your echodataflow environment
-    - `MAMBA_BIN`: full path of your conda or mamba executable
+    - `ECHODATAFLOW_HOME`: your home directory
     - `ECHODATAFLOW_VIZ_CONFIG`: absolute path of `recipes_nrt/edge2cloud_hake/cloud/viz.yaml`
-    - `ECHODATAFLOW_WORKDIR`: absolute path of your echodataflow repository
+    - `MAMBA_BIN`: full path of your conda or mamba executable
 - Install `viz_echogram.service` and `viz_bio.service` as user services
     ```shell
     mkdir -p ~/.config/systemd/user
