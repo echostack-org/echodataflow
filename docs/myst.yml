@@ -16,6 +16,7 @@ project:
               children:
               - file: system_services.md
               - file: prefect_cloud.md
+              - file: auto_mount.md
         - file: recipe_spec.md
         - file: package_structure.md
         - file: add_flow.md

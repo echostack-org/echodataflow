@@ -12,6 +12,7 @@ Note that Prefect also provides a mechanism to run a server and related resource
 ## Template for environment settings
 
 The system services templates provided in Echodataflow use `services.env` to control the many parameters used in the system services. To set this up, copy `src/echodataflow/services/{macos,linux}/services.env.example` to `~/.config/echodataflow/services.env` by:
+
 ```shell
 mkdir -p ~/.config/echodataflow
 cp src/echodataflow/services/macos/services.env.example ~/.config/echodataflow/services.env
@@ -39,6 +40,7 @@ and edit the following parameters:
 On MacOS, system services are deployed through `launchd` via `.plist` files. The following setup runs a local Prefect server and a worker as system services under your user account using configurations from `services.env` via Bash scripts (`run_prefect_server.sh` and `run_prefect_worker.sh`). 
 
 First, from the repository root, copy the MacOS environment template, shared Bash scripts, and server and worker service templates:
+
 ```shell
 mkdir -p ~/.config/echodataflow ~/Library/LaunchAgents ~/.local/var/log/echodataflow
 
@@ -56,6 +58,7 @@ cp src/echodataflow/services/macos/deploy_prefect_worker.launchd.plist \
 Edit `~/.config/echodataflow/services.env` following in explanations above.
 
 Then, load and start the server and the worker:
+
 ```shell
 launchctl bootstrap gui/$(id -u) \
   ~/Library/LaunchAgents/org.echodataflow.prefect-server.plist
@@ -96,6 +99,7 @@ If these scripts are updated, copy the updated versions again using the commands
 On Linux, system services are deployed through `systemd` via `.service` files. The following setup runs a local Prefect server and a worker as system services under your user account using configurations from `services.env` via Bash scripts (`run_prefect_server.sh` and `run_prefect_worker.sh`). 
 
 First, from the repository root, copy the Linux environment template, shared Bash scripts, and server and worker service templates:
+
 ```shell
 mkdir -p ~/.config/echodataflow ~/.config/systemd/user
 
@@ -109,6 +113,7 @@ cp src/echodataflow/services/linux/deploy_prefect_*.service ~/.config/systemd/us
 Edit `~/.config/echodataflow/services.env` following in explanations above.
 
 Then, load and start the server and the worker:
+
 ```shell
 systemctl --user daemon-reload
 systemctl --user enable --now deploy_prefect_server.service deploy_prefect_worker.service
@@ -117,6 +122,7 @@ journalctl --user -u deploy_prefect_server.service -u deploy_prefect_worker.serv
 ```
 
 Afterwards, inspect the error logs to make sure the services are running fine:
+
 ```shell
 tail -n 100 ~/.local/var/log/echodataflow/prefect-server.err.log
 tail -n 100 ~/.local/var/log/echodataflow/prefect-worker.err.log
@@ -125,11 +131,13 @@ tail -n 100 ~/.local/var/log/echodataflow/prefect-worker.err.log
 The worker is ordered after the local server, but this does not guarantee API readiness; failed processes restart after 30 seconds. Logs from the running Prefect commands go to `ECHODATAFLOW_LOG_DIR`; early startup errors go to the journal. After five starts within five minutes, systemd stops retrying. Correct the error and use `systemctl --user reset-failed` before restarting.
 
 To start services at boot and keep them running after logout, enable lingering:
+
 ```shell
 sudo loginctl enable-linger "$USER"
 ```
 
 To stop the services and disable automatic startup:
+
 ```shell
 systemctl --user disable --now deploy_prefect_worker.service deploy_prefect_server.service
 ```

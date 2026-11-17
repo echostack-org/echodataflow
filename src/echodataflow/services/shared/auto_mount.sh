@@ -30,7 +30,7 @@ if [[ "$PLATFORM" == Darwin ]]; then
   : "${SMB_PASSWORD:?SMB_PASSWORD is not set in smb.env}"
 
   # Append macOS service output to files; Linux output goes to the journal
-  LOG_DIR="${ECHODATAFLOW_LOG_DIR:-$HOME/.local/var/log/echodataflow}"
+  LOG_DIR="${SMB_LOG_DIR:-$HOME/.local/var/log/echodataflow}"
   mkdir -p "$LOG_DIR"
   exec >>"$LOG_DIR/auto-mount.out.log" 2>>"$LOG_DIR/auto-mount.err.log"
 else
