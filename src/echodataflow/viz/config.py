@@ -110,7 +110,7 @@ def load_config(
     """Load one YAML section and resolve its directory against the config file.
 
     Only the selected application's settings are validated. Supply a path via 
-    command line or set ECHODATAFLOW_VIZ_CONFIG (loaded from services.env by 
+    command line or set ECHODATAFLOW_VIZ_CONFIG (loaded from viz_services.env by 
     system services).
     """
     models = {"echogram": (EchogramConfig, "cache_dir"), "bio": (BioConfig, "data_dir")}
@@ -121,7 +121,7 @@ def load_config(
     if not configured_path:
         raise ValueError(
             "Visualization configuration path is required: pass --config-file or set "
-            "ECHODATAFLOW_VIZ_CONFIG in services.env for system services."
+            "ECHODATAFLOW_VIZ_CONFIG in viz_services.env for system services."
         )
     config_path = Path(configured_path).expanduser()
     with config_path.open() as stream:

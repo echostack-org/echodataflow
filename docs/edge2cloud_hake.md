@@ -218,13 +218,13 @@ Keep both terminals running. With the default ports set in `viz.yaml`, open `htt
 For persistent operations, it is advantageous to run these visualizations as system services. In the Echodataflow package we supply `viz_echogram.service` and `viz_bio.service` templates under `src/echodataflow/viz/services` that can be run on a Linux cloud VM.
 
 To run these services. Follow the steps below:
-- Copy the environment template from the root of that repository and name it `services.env`:
+- Copy the environment template from the root of that repository and name it `viz_services.env`:
     ```shell
     mkdir -p ~/.config/echodataflow
-    cp src/echodataflow/viz/services/services.env.example_cloud \
-    ~/.config/echodataflow/services.env
+    cp src/echodataflow/viz/services/viz_services.env.example_cloud \
+      ~/.config/echodataflow/viz_services.env
     ```
-- In `services.env`, set the following variables:
+- In `viz_services.env`, set the following variables:
     - `ECHODATAFLOW_ENV`: your echodataflow environment
     - `ECHODATAFLOW_HOME`: your home directory
     - `ECHODATAFLOW_VIZ_CONFIG`: absolute path of `recipes_nrt/edge2cloud_hake/cloud/viz.yaml`
@@ -248,7 +248,7 @@ To run these services. Follow the steps below:
     ```
 
 :::{note}
-If you make changes to `services.env`, restart the apps with
+If you make changes to `viz_services.env`, restart the apps with
 ```shell
 systemctl --user restart viz_echogram.service viz_bio.service
 ```
