@@ -128,6 +128,18 @@ prefect --profile my_cloud cloud workspace set
 The `my_cloud` profile is a local configuration that stores connection settings for your Prefect Cloud workspace. It is separate from the account and workspace created on Prefect Cloud. See the [Prefect Cloud connection guide](https://docs.prefect.io/v3/how-to-guides/cloud/connect-to-cloud) for details.
 :::
 
+:::{tip}
+The following Prefect commands may come in handy:
+```shell
+# view the current configuration
+prefect config view
+
+# view available profiles
+prefect profile ls
+```
+:::
+
+
 
 #### Run a worker in the `cloud-local` work pool
 After establishing the Prefect Cloud connection above, run the following on the cloud VM to create the `cloud-local` work pool (as specified in `recipes_nrt/edge2cloud_hake/cloud/deploy.yaml`) and start a worker for it:
