@@ -95,8 +95,20 @@ Homepage = "https://github.com/echostack-org/echodataflow"
 package-dir = {"" = "src"}
 include-package-data = true
 
+[tool.setuptools.package-data]
+echodataflow = [
+    "services/README.md",
+    "services/shared/*.sh",
+    "services/macos/*.plist",
+    "services/macos/*.env.example",
+    "services/linux/*.service",
+    "services/linux/*.env.example",
+    "services/windows/*.task.xml",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
+exclude = ["echodataflow.services", "echodataflow.services.*"]
 
 [tool.setuptools_scm]
 fallback_version = "0.0.0"
