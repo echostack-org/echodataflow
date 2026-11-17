@@ -220,14 +220,14 @@ PREFECT_PROFILE=my_cloud echodataflow-deploy run \
 
 
 
-### 6. Run visualization services
+### 6. Visualization echogram and biological estimates
 
 The cloud VM runs two visualization apps: echograms and biological estimates. Their settings are in `recipes_nrt/edge2cloud_hake/cloud/viz.yaml` in the recipes repository.
 
 Wait for the cloud workflows to produce the required Zarr, CSV, and GeoJSON files before opening the visualizations.
 
 #### Run the apps in terminals
-In a terminal on the cloud VM, run:
+To visualize near-real-time echogram, in a terminal on the cloud VM, run:
 ```shell
 # activate the echodataflow environment
 conda activate echodataflow
@@ -240,7 +240,7 @@ python -m echodataflow.viz.viz_echogram \
   --config-file recipes_nrt/edge2cloud_hake/cloud/viz.yaml
 ```
 
-In another terminal on the cloud VM, run:
+To visualize near-real-time biological estimates, in another terminal on the cloud VM, run:
 ```shell
 # activate the echodataflow environment
 conda activate echodataflow

@@ -2,13 +2,14 @@
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <!-- Task metadata -->
   <RegistrationInfo>
-    <Description>Run the local Echodataflow Prefect server at user logon.</Description>
+    <Description>Run the local Echodataflow Prefect worker at user logon.</Description>
   </RegistrationInfo>
 
-  <!-- Start at user logon -->
+  <!-- Start after a short delay so the Prefect server can start first -->
   <Triggers>
     <LogonTrigger>
       <Enabled>true</Enabled>
+      <Delay>PT1M</Delay>
     </LogonTrigger>
   </Triggers>
 
@@ -24,7 +25,7 @@
     </Principal>
   </Principals>
 
-  <!-- Keep server resilient and always available -->
+  <!-- Keep worker resilient and always available -->
   <Settings>
     <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
@@ -51,8 +52,7 @@
   <Actions Context="Author">
     <Exec>
       <Command>__PREFECT_EXE__</Command>
-      <Arguments>server start --host 127.0.0.1 --port 4200</Arguments>
-      <WorkingDirectory>__ECHODATAFLOW_WORKDIR__</WorkingDirectory>
+      <Arguments>worker start --pool __PREFECT_POOL__</Arguments>
     </Exec>
   </Actions>
 </Task>

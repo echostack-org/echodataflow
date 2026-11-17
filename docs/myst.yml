@@ -11,14 +11,18 @@ project:
       children:
         - file: installation.md
         - file: how_echodataflow_works.md
-          children:
-            - title: Orchestration options
-              children:
-              - file: system_services.md
-              - file: prefect_cloud.md
         - file: recipe_spec.md
         - file: package_structure.md
         - file: add_flow.md
+        - title: Other resources
+          children:
+            - title: Alternative Prefect setup
+              children:
+                - file: system_services.md
+                - file: prefect_cloud.md
+            - title: Other infrastructure setup
+              children:
+                - file: auto_mount.md
     - title: Pipeline examples
       file: pipeline_examples.md
       children:

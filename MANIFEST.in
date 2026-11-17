@@ -4,3 +4,5 @@ include README.md
 recursive-exclude jupyterbook *
 recursive-exclude docs *
 recursive-exclude notebooks *
+
+recursive-include src/echodataflow/services *.md *.sh *.plist *.service *.env.example *.task.xml

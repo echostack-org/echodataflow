@@ -1,0 +1,17 @@
+[Unit]
+Description=Echodataflow Prefect worker
+After=deploy_prefect_server.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/bin/bash %h/.config/echodataflow/run_prefect_worker.sh
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=echodataflow_prefect_worker
+
+[Install]
+WantedBy=default.target
