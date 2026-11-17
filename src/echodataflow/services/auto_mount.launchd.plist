@@ -17,55 +17,14 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
   </dict>
 
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/zsh</string>
-    <string>-lc</string>
-    <string>
-ENV_FILE="${ECHODATAFLOW_SERVICES_ENV_FILE:-$HOME/.config/echodataflow/services.env}"
-[[ -f "$ENV_FILE" ]] || { echo "Missing $ENV_FILE"; exit 1; }
-
-set -a
-source "$ENV_FILE"
-set +a
-
-: "${SMB_USER:?SMB_USER is not set in services.env}"
-: "${SMB_PASSWORD:?SMB_PASSWORD is not set in services.env}"
-: "${SMB_HOST:?SMB_HOST is not set in services.env}"
-: "${SMB_SHARE:?SMB_SHARE is not set in services.env}"
-: "${SMB_MOUNT_POINT:?SMB_MOUNT_POINT is not set in services.env}"
-
-LOG_DIR="${ECHODATAFLOW_LOG_DIR:-$HOME/.local/log/echodataflow}"
-mkdir -p "$LOG_DIR"
-
-exec >>"$LOG_DIR/auto-mount.out.log" 2>&1 "$LOG_DIR/auto-mount.err.log"
-set -x
-
-echo "$(date): auto mount service started"
-
-mkdir -p "$SMB_MOUNT_POINT"
-
-while true; do
-  if ! /sbin/mount | grep -q "$SMB_MOUNT_POINT"; then
-    echo "$(date): mounting $SMB_MOUNT_POINT"
-
-    /sbin/mount_smbfs \
-      "//${SMB_USER}:${SMB_PASSWORD}@${SMB_HOST}/${SMB_SHARE}" \
-      "$SMB_MOUNT_POINT"
-
-    if [[ $? -eq 0 ]]; then
-      echo "$(date): mount successful"
-    else
-      echo "$(date): mount failed"
-    fi
-  fi
-
-  sleep 300
-done
-    </string>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>exec /bin/bash "$HOME/.config/echodataflow/auto_mount.sh"</string>
   </array>
 </dict>
 </plist>
