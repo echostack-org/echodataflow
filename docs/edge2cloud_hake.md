@@ -54,7 +54,7 @@ To deploy the edge workflows, we first make sure we have the recipes and resourc
 #### Configure file upload destination
 In a terminal, run `rclone config` and follow the [rclone configuration guide](https://rclone.org/commands/rclone_config/) to create a remote for your cloud storage, or use an existing rclone remote. Run this under the same user account that runs the edge worker so the upload flow can access the `rclone.conf` file.
 
-In `recipes_nrt/edge2cloud_hake/edge/params.yaml`, set `file_upload_acoustics.dest_dir` using the rclone format `REMOTE:BUCKET/PREFIX`:
+In `recipes_nrt/edge2cloud_hake/edge/params.yaml`, set `file_upload_acoustics.dest_dir` using the rclone format `REMOTE:BUCKET/FOLDER`:
 ```yaml
 flows:
   file_upload_acoustics:
@@ -160,7 +160,28 @@ Similar to the local Prefect dashboard, open your workspace in the [Prefect Clou
 
 ### 5. Deploy cloud workflows
 
-In another terminal on the cloud VM, activate the environment and run the deployment command from the recipes repository using the `my_cloud` profile:
+
+#### Configure cloud data product locations
+Similar to what we did to run the edge workflows, we need to config rclone to create a remote for the cloud storage location where we had set the edge workflows to upload data to.
+
+In `recipes_nrt/edge2cloud_hake/cloud/params.yaml`:
+- point `path_bio_files`, `path_NASC_files`, and `path_MVBS` to the cloud bucket location, for example:
+  ```yaml
+  flows:
+    ingest_haul:
+      path_bio_files: my_bucket/test_data/trawl
+      ...
+    ingest_NASC:
+      path_NASC_files: my_bucket/test_data/acoustics/NASC
+      ...
+    update_cache_MVBS:
+      path_MVBS: my_bucket/test_data/acoustics/MVBS
+  ```
+- point `cred_file` to the location where your `rclone.conf` files is located. You can find its location by running `rclone config file` in a terminal
+
+
+#### Deploy cloud workflows
+In a terminal on the cloud VM, activate the environment and run the deployment command from the recipes repository using the `my_cloud` profile:
 ```shell
 # activate the echodataflow environment
 conda activate echodataflow
