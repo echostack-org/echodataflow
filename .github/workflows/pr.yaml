@@ -10,6 +10,18 @@ permissions:
   contents: read
 
 jobs:
+  actionlint:
+    name: Check GitHub Actions workflows
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Check workflow files
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color
+
   tests:
     name: Python ${{ matrix.python-version }} tests
     runs-on: ubuntu-26.04

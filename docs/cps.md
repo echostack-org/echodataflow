@@ -55,7 +55,7 @@ python -m pip show echodataflow echopype echoshader prefect
 | Package | Expected version |
 | --- | --- |
 | Python | >=3.13,<3.15 (3.13 or 3.14) |
-| echodataflow | Local editable checkout (version may be a development build) |
+| echodataflow | Version 0.2.0 or later, installed with the `mission` extra |
 | echopype | 0.12.0 |
 | echoshader | 0.2.3 |
 | echoregions | 0.2.4 |

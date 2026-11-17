@@ -29,12 +29,15 @@ rclone version
 
 ## Install Echodataflow
 
-Echodataflow `v0.2.0` is currently under development and has not been released, and therefore cannot be installed directly from PyPI or conda yet.
-
 ### Install as a package
-To run Echodataflow as an installed package, install it directly from the repository:
+Install Echodataflow from PyPI:
 ```shell
-uv pip install "echodataflow[dev,mission] @ git+https://github.com/echostack-org/echodataflow.git"
+uv pip install "echodataflow>=0.2.0"
+```
+
+To also install the dependencies used by the example pipelines, install the `mission` extra:
+```shell
+uv pip install "echodataflow[mission]>=0.2.0"
 ```
 
 ### Install for development
