@@ -110,7 +110,7 @@ Once the command runs through, explore the local Prefect dashboard [http://127.0
 
 
 
-### 4. Run cloud Prefect worker and connect to Prefect Cloud
+### 4. Connect to Prefect Cloud and run a worker
 
 To run the cloud workflows, we first make sure we have the environment and Prefect Cloud workspace ready by doing the following:
 - Configure and start a cloud VM
@@ -164,17 +164,13 @@ prefect profile ls
 
 
 
-#### Run a worker in the `cloud-local` work pool
+#### Run a worker
 After establishing the Prefect Cloud connection above, run the following on the cloud VM to create the `cloud-local` work pool (as specified in `recipes_nrt/edge2cloud_hake/cloud/deploy.yaml`) and start a worker for it:
 ```shell
 # create the work pool "cloud-local" and start a worker
 prefect --profile my_cloud worker start --pool cloud-local --type process
 ```
-Keep this terminal running while using the workflow. 
-
-
-#### Check Prefect Cloud dashboard
-Now, Prefect Cloud can orchestrate the runs with the worker executing them on the cloud VM.
+Now, Prefect Cloud can orchestrate the runs that will be executed by this worker on the cloud VM.
 
 Similar to the local Prefect dashboard, open your workspace in the [Prefect Cloud dashboard](https://app.prefect.cloud/) and check that a worker is online under **Work Pools → cloud-local → Workers**. 
 
