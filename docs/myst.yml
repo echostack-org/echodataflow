@@ -11,6 +11,10 @@ project:
       children:
         - file: installation.md
         - file: how_echodataflow_works.md
+        - file: recipe_spec.md
+        - file: package_structure.md
+        - file: add_flow.md
+        - title: Other resources
           children:
             - title: Alternative Prefect setup
               children:
@@ -19,9 +23,6 @@ project:
             - title: Other infrastructure setup
               children:
                 - file: auto_mount.md
-        - file: recipe_spec.md
-        - file: package_structure.md
-        - file: add_flow.md
     - title: Pipeline examples
       file: pipeline_examples.md
       children:
