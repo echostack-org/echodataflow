@@ -1,6 +1,9 @@
 # Echodataflow
 
 <div align="center">
+  <a href="https://pypi.org/project/echodataflow/">
+    <img src="https://img.shields.io/pypi/v/echodataflow" alt="PyPI version"/>
+  </a>
   <a href="https://echodataflow.readthedocs.io/en/latest/?badge=latest">
     <img src="https://readthedocs.org/projects/echodataflow/badge/?version=latest" alt="docs"/>
   </a>
