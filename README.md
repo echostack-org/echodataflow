@@ -1,9 +1,9 @@
 # Echodataflow
 
 <div align="center">
-  <!-- <a href="https://echodataflow.readthedocs.io/en/latest/?badge=latest">
+  <a href="https://echodataflow.readthedocs.io/en/latest/?badge=latest">
     <img src="https://readthedocs.org/projects/echodataflow/badge/?version=latest" alt="docs"/>
-  </a> -->
+  </a>
   <a href="https://codecov.io/gh/echostack-org/echodataflow">
     <img src="https://codecov.io/gh/echostack-org/echodataflow/graph/badge.svg?token=YTMVVHG585" alt="codecov"/>
   </a>
