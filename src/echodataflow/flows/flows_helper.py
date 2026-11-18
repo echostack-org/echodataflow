@@ -1,80 +1,80 @@
+import subprocess
+import tempfile
+import threading
 from pathlib import Path
-import datetime
 
-from prefect import flow
+from prefect import flow, get_run_logger
 
 
-@flow(timeout_seconds=600, log_prints=True)
+@flow(log_prints=True)
 def flow_file_upload(
     src_dir: str,
     dest_dir: str,
     exclude_subdirs: list[str],
     max_age: int = -1,
+    timeout_seconds: float = 600,
 ):
-    """
-    Upload files via rclone.
+    """Upload files via rclone.
 
     Parameters
     ----------
     src_dir : str
         Source directory to upload files from.
-    dest_dir : str, optional
-        Destination directory to upload files to, by default "osn_sdsc_hake:/agr230002-bucket01/prefect_test".
-    exclude_subdirs : list, optional
-        List of subdirectories to exclude from the upload, by default [].
+    dest_dir : str
+        Destination directory for the upload.
+    exclude_subdirs : list[str]
+        Subdirectories to exclude from the upload.
     max_age : int, optional
-        Maximum age of files to upload in hours, by default -1 (no limit).
+        Maximum age of files to upload in hours; -1 means no limit.
+    timeout_seconds : float, optional
+        Maximum time in seconds for rclone to run, by default 600.
     """
+    if timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be positive")
 
-    src_dir = Path(src_dir).expanduser().resolve()  # resolve to absolute path
-    if not Path(src_dir).exists():
+    src_dir = Path(src_dir).expanduser().resolve()
+    if not src_dir.exists():
         print(f"Skipping file upload: source directory does not exist: {src_dir}")
         return
 
-    # TODO: need to fix dependency issue
-    # TODO: consider moving it back to top imports
-    from prefect_shell import ShellOperation
+    logger = get_run_logger()
+    exclude_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", prefix="upload_exclude_folders_", suffix=".txt",
+            dir=src_dir, delete=False,
+        ) as file:
+            exclude_path = Path(file.name)
+            file.write(".DS_Store\nupload_exclude_folders_*.txt\n")
+            for subdir in exclude_subdirs:
+                file.write(f"/{subdir}/**\n")
 
-    # Generate upload_exclude_folders.txt
-    exclude_filename = (
-        f"upload_exclude_folders_"
-        f"{datetime.datetime.now(datetime.UTC).strftime('%Y%m%d_%H%M%S')}.txt"
-    )
-    exclude_path = Path(src_dir) / exclude_filename
-    print(f"exclusion list file: {exclude_path}")
-    with open(exclude_path, "w") as file:
-        # Add .DS_Store to exclude list
-        file.write(".DS_Store\n")
-        # Exclude all upload_exclude_folders_*.txt files (i.e. this file and any leftover ones)
-        file.write("upload_exclude_folders_*.txt\n")
-        # Add other subdirectories
-        for subdir in exclude_subdirs:
-            file.write(f"/{subdir}/**\n")
+        logger.info("Exclusion list file: %s", exclude_path)
+        command = ["rclone", "copy", "-v", "--s3-no-check-bucket", "--no-traverse"]
+        if max_age != -1:
+            command.extend(["--max-age", f"{max_age}h"])
+        command.extend([str(src_dir), dest_dir, "--exclude-from", str(exclude_path)])
 
-    # Potentially long running so using a context manager
-    if max_age == -1:
-        command = (
-            "rclone copy -v --s3-no-check-bucket --no-traverse "
-            f"{src_dir} {dest_dir} --exclude-from {exclude_path}"
-        )
-    else:
-        command = (
-            f"rclone copy -v --s3-no-check-bucket --max-age {max_age}h "
-            f"--no-traverse {src_dir} {dest_dir} --exclude-from {exclude_path}"
-        )
+        with subprocess.Popen(
+            command, cwd=src_dir, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, bufsize=1,
+        ) as process:
+            def log_output():
+                for line in process.stdout:
+                    logger.info("%s", line.rstrip())
 
-    with ShellOperation(
-        commands=[command],
-        working_dir=src_dir,
-    ) as file_upload_operation:
-        # Trigger runs the process in the background
-        file_upload_process = file_upload_operation.trigger()
-
-        # Wait for the process to finish
-        file_upload_process.wait_for_completion()
-
-        # Print results
-        file_upload_process.fetch_result()
-
-    # Remove the exclude list file after upload
-    exclude_path.unlink(missing_ok=True)
+            reader = threading.Thread(target=log_output, daemon=True)
+            reader.start()
+            try:
+                returncode = process.wait(timeout=timeout_seconds)
+            except BaseException:
+                process.kill()
+                process.wait()
+                raise
+            finally:
+                reader.join()
+            if returncode:
+                raise subprocess.CalledProcessError(returncode, command)
+    finally:
+        if exclude_path is not None:
+            exclude_path.unlink(missing_ok=True)
